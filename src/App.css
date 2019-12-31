@@ -1,0 +1,31 @@
+h1 {
+  font-size: 32px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 2s ease-in;
+  }
+}
+
+.App-logo {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    color: black;
+  }
+  25% {
+    color: blue;
+  }
+  50% {
+    color: blueviolet;
+  }
+  75% {
+    color: darkcyan;
+  }
+  to {
+    color: black;
+  }
+}
