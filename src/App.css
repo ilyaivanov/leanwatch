@@ -1,31 +1,36 @@
-h1 {
-  font-size: 32px;
+:root {
+  background-color: #70797e;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 2s ease-in;
-  }
+h4 {
+  margin-left: 1em;
+  margin-right: 1em;
 }
 
-.App-logo {
-  color: #61dafb;
+.stack {
+  background-color: #e6e7ec;
+  margin-left: 1em;
+  margin-top: 1em;
 }
 
-@keyframes App-logo-spin {
-  from {
-    color: black;
-  }
-  25% {
-    color: blue;
-  }
-  50% {
-    color: blueviolet;
-  }
-  75% {
-    color: darkcyan;
-  }
-  to {
-    color: black;
-  }
+.card {
+  margin: 1em;
+  width: 200px;
+  background-color: #ffffff;
+  border-radius: 0.3em;
+}
+
+.card-image {
+  border-top-left-radius: 0.3em;
+  border-top-right-radius: 0.3em;
+}
+
+.card-title {
+  margin: 1em;
+}
+
+.board {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
 }
