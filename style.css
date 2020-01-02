@@ -1,0 +1,32 @@
+:root {
+  margin: 0;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;;
+}
+
+h1 {
+  font-size: 32px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .logo {
+    animation: logo-color-spin infinite 2s ease-in;
+  }
+}
+
+@keyframes logo-color-spin {
+  from {
+    color: black;
+  }
+  25% {
+    color: blue;
+  }
+  50% {
+    color: blueviolet;
+  }
+  75% {
+    color: darkcyan;
+  }
+  to {
+    color: black;
+  }
+}

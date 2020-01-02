@@ -25,3 +25,7 @@ yarn-error.log*
 
 # IntelliJ Idea
 .idea
+
+# Elm
+elm.js
+elm-stuff
