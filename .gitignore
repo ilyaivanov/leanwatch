@@ -28,4 +28,5 @@ yarn-error.log*
 
 # Elm
 elm.js
+elm.min.js
 elm-stuff
