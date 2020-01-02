@@ -1,14 +1,10 @@
-port module Main exposing (..)
+port module Main exposing (main)
 
 import Browser
-import Browser.Dom as Dom
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Html.Keyed as Keyed
-import Html.Lazy exposing (lazy, lazy2)
-import Json.Decode as Json
-import Task
+import Json.Decode as Decode
 
 
 main : Program (Maybe Model) Model Msg
@@ -30,49 +26,105 @@ command for every step of the update function.
 updateWithStorage : Msg -> Model -> ( Model, Cmd Msg )
 updateWithStorage msg model =
     let
-        ( newModel, cmds ) =
+        newModel =
             update msg model
     in
     ( newModel
-    , Cmd.batch [ setStorage newModel, cmds ]
+    , Cmd.batch [ setStorage newModel, Cmd.none ]
     )
 
 
-
--- MODEL
-
 type alias Model =
-    { message : String
+    { items : List String
+    , itemBeingDragged : Maybe String
     }
+
+
+type alias DragOver =
+    { offsetY : Int
+    , offsetHeight : Int
+    }
+
+
+type Msg
+    = OnDragOver String DragOver
+    | DragStart String
+    | DragEnd
+
+
+pointDecoder : Decode.Decoder DragOver
+pointDecoder =
+    Decode.map2 DragOver
+        (Decode.field "offsetY" Decode.int)
+        (Decode.at [ "target", "offsetHeight" ] Decode.int)
+
+
+onDragOver : (DragOver -> msg) -> Attribute msg
+onDragOver tagger =
+    on "dragover" (Decode.map tagger pointDecoder)
+
+
+onDragStart : msg -> Attribute msg
+onDragStart msg =
+    on "dragstart" (Decode.succeed msg)
+
+
+onDragEnd : msg -> Attribute msg
+onDragEnd msg =
+    on "dragend" (Decode.succeed msg)
+
+
+update : Msg -> Model -> Model
+update msg model =
+    case msg of
+        OnDragOver item _ ->
+            --dragging model.itemBeingDragged over item
+            model
+
+        DragStart item ->
+            { model | itemBeingDragged = Just item }
+
+        DragEnd ->
+            { model | itemBeingDragged = Nothing }
 
 
 init : Maybe Model -> ( Model, Cmd Msg )
 init _ =
-    ( { message = "Lean Watch From Elm"
+    ( { items = List.map (\n -> "Item " ++ String.fromInt n) (List.range 1 10)
+      , itemBeingDragged = Nothing
       }
     , Cmd.none
     )
 
 
-
--- UPDATE
-
-
-type Msg
-    = NoOp
-
-
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        NoOp ->
-            ( model, Cmd.none )
-
-
-
--- VIEW
-
-
 view : Model -> Html Msg
 view model =
-    h1 [class "logo"] [ text model.message ]
+    let
+        dragId =
+            model.itemBeingDragged |> Maybe.withDefault ""
+    in
+    div [] (List.map (\item -> viewItem (item == dragId) item) model.items)
+
+
+viewItem : Bool -> String -> Html Msg
+viewItem isDragging item =
+    div
+        [ class
+            ("item"
+                ++ classIf isDragging "item-preview"
+            )
+        , onDragOver (OnDragOver item)
+        , onDragStart (DragStart item)
+        , onDragEnd DragEnd
+        , draggable "true"
+        ]
+        [ text item ]
+
+
+classIf : Bool -> String -> String
+classIf condition class =
+    if condition then
+        " " ++ class
+
+    else
+        ""
