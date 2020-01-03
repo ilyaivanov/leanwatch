@@ -54,14 +54,20 @@ h1 {
   color: rgba(0, 0, 0, 0);
 }
 
-.board{
+.board {
   display: flex;
   flex-direction: row;
-  align-items: flex-start;
+  align-items: stretch;
+  height: 100vh;
 }
 
-.column{
+.column {
   padding: 1em;
   background-color: cadetblue;
+  
+}
+
+.column-drag-overlay {
   margin-left: 1em;
+  background-color: rgb(234, 253, 205);
 }

@@ -38,6 +38,7 @@ updateWithStorage msg model =
 type alias Model =
     { stacks : Dict String (List String)
     , itemBeingDragged : Maybe String
+    , listBeingDragged : Maybe String
     }
 
 
@@ -57,6 +58,7 @@ init _ =
                 , ( "42", createItems 42 44 )
                 ]
       , itemBeingDragged = Nothing
+      , listBeingDragged = Nothing
       }
     , Cmd.none
     )
@@ -131,6 +133,7 @@ insertInto index item ary =
     [ left, right ]
         |> List.concat
 
+
 removeItem : item -> List item -> List item
 removeItem item items =
     List.filter (notEquals item) items
@@ -162,9 +165,11 @@ view model =
 
 viewStack : String -> ( String, List String ) -> Html Msg
 viewStack dragId ( stackId, items ) =
-    div [ class "column" ]
-        [ h2 [] [ text ("Stack " ++ stackId) ]
-        , div [] (List.map (\item -> viewItem (item == dragId) item) items)
+    div [ class "column-drag-overlay" ]
+        [ div [ class "column" ]
+            [ h2 [] [ text ("Stack " ++ stackId) ]
+            , div [] (List.map (\item -> viewItem (item == dragId) item) items)
+            ]
         ]
 
 
