@@ -54,6 +54,7 @@ init _ =
             Dict.fromList
                 [ ( "1", createItems 1 7 )
                 , ( "2", createItems 8 12 )
+                , ( "42", createItems 42 44 )
                 ]
       , itemBeingDragged = Nothing
       }
@@ -155,15 +156,12 @@ view model =
             model.itemBeingDragged |> Maybe.withDefault ""
     in
     div [ onDragOver Noop, class "board" ]
-        [ viewStack "Stack 1" dragId (Dict.get "1" model.stacks |> Maybe.withDefault [])
-        , viewStack "Stack 2" dragId (Dict.get "2" model.stacks |> Maybe.withDefault [])
-        ]
+        (Dict.toList model.stacks |> List.map (viewStack dragId))
 
-
-viewStack : String -> String -> List String -> Html Msg
-viewStack stackName dragId items =
+viewStack : String -> ( String, List String ) -> Html Msg
+viewStack dragId ( stackId, items ) =
     div [ class "column" ]
-        [ h2 [] [ text stackName ]
+        [ h2 [] [ text ("Stack " ++ stackId) ]
         , div [] (List.map (\item -> viewItem (item == dragId) item) items)
         ]
 
