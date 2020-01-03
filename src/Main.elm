@@ -37,8 +37,10 @@ updateWithStorage msg model =
 
 type alias Model =
     { stacks : Dict String (List String)
+    , stacksOrder : List String
+    , isStackDragging : Bool
     , itemBeingDragged : Maybe String
-    , listBeingDragged : Maybe String
+    , stackIdBeingDragged : Maybe String
     }
 
 
@@ -46,6 +48,11 @@ type Msg
     = OnDragOver String
     | DragStart String
     | DragEnd
+    | EnableDragForStack String
+    | DisableDragForStack
+    | OnStackDragOver String
+    | OnStackDragStart
+    | OnStackDragEnd
     | Noop
 
 
@@ -57,8 +64,10 @@ init _ =
                 , ( "2", createItems 8 12 )
                 , ( "42", createItems 42 44 )
                 ]
+      , stacksOrder = [ "1", "42", "2" ]
       , itemBeingDragged = Nothing
-      , listBeingDragged = Nothing
+      , stackIdBeingDragged = Nothing
+      , isStackDragging = False
       }
     , Cmd.none
     )
@@ -118,6 +127,40 @@ update msg model =
         DragEnd ->
             { model | itemBeingDragged = Nothing }
 
+        EnableDragForStack stackId ->
+            { model | stackIdBeingDragged = Just (log "EnableDragForStack" stackId) }
+
+        DisableDragForStack ->
+            --For some reason onMouseLeave handler triggers during drag, ignore those events
+            if model.isStackDragging then
+                model
+
+            else
+                { model | stackIdBeingDragged = log "DisableDragForStack" Nothing }
+
+        OnStackDragEnd ->
+            { model | stackIdBeingDragged = log "OnStackDragEnd" Nothing, isStackDragging = False }
+
+        OnStackDragOver stackUnder ->
+            case model.stackIdBeingDragged of
+                Just stackOver ->
+                    let
+                        targetIndex =
+                            findIndex (equals stackUnder) model.stacksOrder |> Maybe.withDefault -1
+
+                        stacksOrder =
+                            model.stacksOrder
+                                |> removeItem stackOver
+                                |> insertInto targetIndex stackOver
+                    in
+                    { model | stacksOrder = stacksOrder }
+
+                Nothing ->
+                    model
+
+        OnStackDragStart ->
+            { model | isStackDragging = True }
+
         Noop ->
             model
 
@@ -158,19 +201,45 @@ view model =
     let
         dragId =
             model.itemBeingDragged |> Maybe.withDefault ""
+
+        stackDragId =
+            model.stackIdBeingDragged |> Maybe.withDefault ""
     in
-    div [ onDragOver Noop, class "board" ]
-        (Dict.toList model.stacks |> List.map (viewStack dragId))
+    div [ onDragOver Noop, onMouseUp OnStackDragEnd, class "board" ]
+        (model.stacksOrder
+            |> List.map (\stackId -> ( stackId, Dict.get stackId model.stacks |> Maybe.withDefault [] ))
+            |> List.map (\( stackId, stackM ) -> viewStack dragId stackDragId (stackDragId == stackId && model.isStackDragging) ( stackId, stackM ))
+        )
 
 
-viewStack : String -> ( String, List String ) -> Html Msg
-viewStack dragId ( stackId, items ) =
-    div [ class "column-drag-overlay" ]
-        [ div [ class "column" ]
-            [ h2 [] [ text ("Stack " ++ stackId) ]
+viewStack : String -> String -> Bool -> ( String, List String ) -> Html Msg
+viewStack dragId stackDragId isDragging ( stackId, items ) =
+    let
+        isStackBeingDragged =
+            stackDragId == stackId
+    in
+    div [ class "column-drag-overlay", onDragOver (OnStackDragOver stackId) ]
+        [ div
+            [ class ("column" ++ classIf isDragging "column-preview")
+            , draggable (isDragable isStackBeingDragged)
+            , onDragStart OnStackDragStart
+            , onDragEnd OnStackDragEnd
+            ]
+            [ div [ class "column-title", onMouseLeave DisableDragForStack, onMouseEnter (EnableDragForStack stackId) ]
+                [ span [] [ text ("Stack " ++ stackId) ]
+                ]
             , div [] (List.map (\item -> viewItem (item == dragId) item) items)
             ]
         ]
+
+
+isDragable : Bool -> String
+isDragable cond =
+    if cond then
+        "true"
+
+    else
+        "false"
 
 
 viewItem : Bool -> String -> Html Msg

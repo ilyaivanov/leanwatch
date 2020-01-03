@@ -64,7 +64,16 @@ h1 {
 .column {
   padding: 1em;
   background-color: cadetblue;
-  
+}
+
+.column-title {
+  cursor: pointer;
+  background-color: rgb(234, 253, 205);
+}
+
+.column-preview {
+  background-color: blue;
+  visibility: hidden;
 }
 
 .column-drag-overlay {
