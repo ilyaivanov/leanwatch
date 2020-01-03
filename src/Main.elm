@@ -38,11 +38,13 @@ updateWithStorage msg model =
 type alias Model =
     { stacks : Dict String (List String)
     , stacksOrder : List String
+
+    --Consider using a single type for next three props
+    --To make invalid states impossible https://www.youtube.com/watch?v=IcgmSRJHu_8
     , isStackDragging : Bool
     , itemBeingDragged : Maybe String
     , stackIdBeingDragged : Maybe String
     }
-
 
 type Msg
     = OnDragOver String
@@ -63,8 +65,9 @@ init _ =
                 [ ( "1", createItems 1 7 )
                 , ( "2", createItems 8 12 )
                 , ( "42", createItems 42 44 )
+                , ( "Empty", [] )
                 ]
-      , stacksOrder = [ "1", "42", "2" ]
+      , stacksOrder = [ "1", "42", "2", "Empty" ]
       , itemBeingDragged = Nothing
       , stackIdBeingDragged = Nothing
       , isStackDragging = False
@@ -85,42 +88,6 @@ createItems from to =
 update : Msg -> Model -> Model
 update msg model =
     case msg of
-        OnDragOver itemUnder ->
-            case model.itemBeingDragged of
-                Nothing ->
-                    model
-
-                Just itemOver ->
-                    if itemOver == itemUnder then
-                        model
-
-                    else
-                        let
-                            getStackByItem item =
-                                Dict.toList model.stacks
-                                    |> List.filter (\( _, value ) -> List.member item value)
-                                    |> List.head
-                                    |> Maybe.withDefault ( "NOT_FOUND", [] )
-
-                            updateStack stackId updater stacks =
-                                Dict.update stackId (Maybe.map (\v -> updater v)) stacks
-
-                            ( fromStackId, _ ) =
-                                getStackByItem itemOver
-
-                            ( toStackId, toStackItems ) =
-                                getStackByItem itemUnder
-
-                            targetIndex =
-                                findIndex (equals itemUnder) toStackItems |> Maybe.withDefault -1
-
-                            newStacks =
-                                model.stacks
-                                    |> updateStack fromStackId (removeItem itemOver)
-                                    |> updateStack toStackId (insertInto targetIndex itemOver)
-                        in
-                        { model | stacks = newStacks }
-
         DragStart item ->
             { model | itemBeingDragged = Just item }
 
@@ -146,6 +113,36 @@ update msg model =
         OnStackDragEnd ->
             { model | stackIdBeingDragged = log "OnStackDragEnd" Nothing, isStackDragging = False }
 
+        OnDragOver itemUnder ->
+            case model.itemBeingDragged of
+                Nothing ->
+                    model
+
+                Just itemOver ->
+                    if itemOver == itemUnder then
+                        model
+
+                    else
+                        let
+                            updateStack stackId updater stacks =
+                                Dict.update stackId (Maybe.map (\v -> updater v)) stacks
+
+                            ( fromStackId, _ ) =
+                                getStackByItem itemOver model.stacks
+
+                            ( toStackId, toStackItems ) =
+                                getStackByItem itemUnder model.stacks
+
+                            targetIndex =
+                                findIndex (equals itemUnder) toStackItems |> Maybe.withDefault -1
+
+                            newStacks =
+                                model.stacks
+                                    |> updateStack fromStackId (removeItem itemOver)
+                                    |> updateStack toStackId (insertInto targetIndex itemOver)
+                        in
+                        { model | stacks = newStacks }
+
         OnStackDragOver stackUnder ->
             case model.stackIdBeingDragged of
                 Just stackOver ->
@@ -161,6 +158,10 @@ update msg model =
                     { model | stacksOrder = stacksOrder }
 
                 Nothing ->
+                    let
+                        a =
+                            log ("OnStackDragOver stackUnder:" ++ stackUnder) 42
+                    in
                     model
 
         OnStackDragStart ->
@@ -168,6 +169,14 @@ update msg model =
 
         Noop ->
             model
+
+
+getStackByItem : String -> Dict String (List String) -> ( String, List String )
+getStackByItem item stacks =
+    Dict.toList stacks
+        |> List.filter (\( _, value ) -> List.member item value)
+        |> List.head
+        |> Maybe.withDefault ( "NOT_FOUND", [] )
 
 
 insertInto : Int -> item -> List item -> List item
@@ -233,7 +242,13 @@ viewStack dragId stackDragId isDragging ( stackId, items ) =
             [ div [ class "column-title", onMouseLeave DisableDragForStack, onMouseEnter (EnableDragForStack stackId) ]
                 [ span [] [ text ("Stack " ++ stackId) ]
                 ]
-            , div [] (List.map (\item -> viewItem (item == dragId) item) items)
+            , div []
+                (if List.isEmpty items then
+                    [ viewEmptyPlaceholder ]
+
+                 else
+                    List.map (\item -> viewItem (item == dragId) item) items
+                )
             ]
         ]
 
@@ -245,6 +260,10 @@ isDragable cond =
 
     else
         "false"
+
+
+viewEmptyPlaceholder =
+    div [ class "item-placeholder" ] []
 
 
 viewItem : Bool -> String -> Html Msg

@@ -49,6 +49,13 @@ h1 {
   border: 1px solid grey;
 }
 
+.item-placeholder {
+  margin-top: 1em;
+  height: 40px;
+  width: 120px;
+  background-color: rgb(234, 253, 205);
+}
+
 .item-preview {
   border: 2px dashed grey;
   color: rgba(0, 0, 0, 0);
@@ -64,6 +71,8 @@ h1 {
 .column {
   padding: 1em;
   background-color: cadetblue;
+  max-height: 100vh;
+  overflow: auto;
 }
 
 .column-title {
@@ -72,8 +81,7 @@ h1 {
 }
 
 .column-preview {
-  background-color: blue;
-  visibility: hidden;
+  opacity: 0.4;
 }
 
 .column-drag-overlay {
