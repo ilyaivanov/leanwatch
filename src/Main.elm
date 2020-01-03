@@ -128,7 +128,12 @@ update msg model =
             { model | itemBeingDragged = Nothing }
 
         EnableDragForStack stackId ->
-            { model | stackIdBeingDragged = Just (log "EnableDragForStack" stackId) }
+            --For some reason onMouseEnter handler triggers during drag, ignore those events
+            if model.isStackDragging then
+                model
+
+            else
+                { model | stackIdBeingDragged = Just (log "EnableDragForStack" stackId) }
 
         DisableDragForStack ->
             --For some reason onMouseLeave handler triggers during drag, ignore those events
