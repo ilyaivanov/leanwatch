@@ -1,7 +1,8 @@
-port module Main exposing (main)
+module Main exposing (main)
 
 import Browser
 import Debug exposing (log)
+import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -9,7 +10,7 @@ import Json.Decode as Decode
 import List.Extra exposing (findIndex, splitAt)
 
 
-main : Program (Maybe Model) Model Msg
+main : Program (Maybe ()) Model Msg
 main =
     Browser.document
         { init = init
@@ -19,12 +20,6 @@ main =
         }
 
 
-port setStorage : Model -> Cmd msg
-
-
-{-| We want to `setStorage` on every update. This function adds the setStorage
-command for every step of the update function.
--}
 updateWithStorage : Msg -> Model -> ( Model, Cmd Msg )
 updateWithStorage msg model =
     let
@@ -32,7 +27,7 @@ updateWithStorage msg model =
             update msg model
     in
     ( newModel
-    , Cmd.batch [ setStorage newModel, Cmd.none ]
+    , Cmd.none
     )
 
 
@@ -41,14 +36,8 @@ updateWithStorage msg model =
 
 
 type alias Model =
-    { items : List String
+    { stacks : Dict String (List String)
     , itemBeingDragged : Maybe String
-    }
-
-
-type alias DragOver =
-    { offsetY : Int
-    , offsetHeight : Int
     }
 
 
@@ -59,13 +48,22 @@ type Msg
     | Noop
 
 
-init : Maybe Model -> ( Model, Cmd Msg )
+init : Maybe () -> ( Model, Cmd Msg )
 init _ =
-    ( { items = List.map (\n -> "Item " ++ String.fromInt n) (List.range 1 10)
+    ( { stacks =
+            Dict.fromList
+                [ ( "1", createItems 1 7 )
+                , ( "2", createItems 8 12 )
+                ]
       , itemBeingDragged = Nothing
       }
     , Cmd.none
     )
+
+
+createItems : Int -> Int -> List String
+createItems from to =
+    List.map (\n -> "Item " ++ String.fromInt n) (List.range from to)
 
 
 
@@ -82,15 +80,24 @@ update msg model =
 
                 Just itemOver ->
                     let
-                        index =
-                            findIndex (equals itemUnder) model.items |> Maybe.withDefault -1
-
-                        items =
-                            model.items
-                                |> List.filter (notEquals itemOver)
-                                |> insertInto index itemOver
+                        stackM =
+                            Dict.get "1" model.stacks
                     in
-                    { model | items = items }
+                    case stackM of
+                        Just stack ->
+                            let
+                                index =
+                                    findIndex (equals itemUnder) stack |> Maybe.withDefault -1
+
+                                items =
+                                    stack
+                                        |> List.filter (notEquals itemOver)
+                                        |> insertInto index itemOver
+                            in
+                            { model | stacks = Dict.update "1" (\_ -> Just items) model.stacks }
+
+                        Nothing ->
+                            model
 
         DragStart item ->
             { model | itemBeingDragged = Just item }
@@ -134,7 +141,18 @@ view model =
         dragId =
             model.itemBeingDragged |> Maybe.withDefault ""
     in
-    div [ onDragOver Noop, class "foo" ] (List.map (\item -> viewItem (item == dragId) item) model.items)
+    div [ onDragOver Noop, class "board" ]
+        [ viewStack "Stack 1" dragId (Dict.get "1" model.stacks |> Maybe.withDefault [])
+        , viewStack "Stack 2" dragId (Dict.get "2" model.stacks |> Maybe.withDefault [])
+        ]
+
+
+viewStack : String -> String -> List String -> Html Msg
+viewStack stackName dragId items =
+    div [ class "column" ]
+        [ h2 [] [ text stackName ]
+        , div [] (List.map (\item -> viewItem (item == dragId) item) items)
+        ]
 
 
 viewItem : Bool -> String -> Html Msg

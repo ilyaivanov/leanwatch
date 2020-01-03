@@ -46,7 +46,6 @@ h1 {
   align-items: center;
   justify-content: center;
   margin-top: 1em;
-  margin-left: 1em;
   font-size: 28px;
   border: 1px solid grey;
 }
@@ -54,4 +53,14 @@ h1 {
 .item-preview {
   border: 2px dashed grey;
   color: rgba(0, 0, 0, 0);
+}
+
+.board{
+  display: flex;
+  flex-direction: row;
+}
+
+.column{
+  background-color: azure;
+  margin-left: 1em;
 }
