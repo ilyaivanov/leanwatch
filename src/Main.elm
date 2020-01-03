@@ -90,28 +90,27 @@ update msg model =
                                     |> List.head
                                     |> Maybe.withDefault ( "NOT_FOUND", [] )
 
-                            updateStack stackId items stacks =
-                                Dict.update stackId (\_ -> Just items) stacks
+                            updateStack stackId updater stacks =
+                                Dict.update stackId (Maybe.map (\v -> updater v)) stacks
 
                             removeItem item items =
                                 List.filter (notEquals item) items
 
-                            ( fromStackId, fromStackItems ) =
+                            ( fromStackId, _ ) =
                                 getStackByItem itemOver
 
                             ( toStackId, toStackItems ) =
                                 getStackByItem itemUnder
 
                             targetIndex =
-                                log "targetIndex" (findIndex (equals itemUnder) toStackItems |> Maybe.withDefault -1)
+                                findIndex (equals itemUnder) toStackItems |> Maybe.withDefault -1
 
-                            without =
-                                updateStack fromStackId (removeItem itemOver fromStackItems) model.stacks
-
-                            with =
-                                updateStack toStackId (insertInto targetIndex itemOver toStackItems) without
+                            newStacks =
+                                model.stacks
+                                    |> updateStack fromStackId (removeItem itemOver)
+                                    |> updateStack toStackId (insertInto targetIndex itemOver)
                         in
-                        { model | stacks = with }
+                        { model | stacks = newStacks }
 
         DragStart item ->
             { model | itemBeingDragged = Just item }
