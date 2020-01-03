@@ -79,25 +79,39 @@ update msg model =
                     model
 
                 Just itemOver ->
-                    let
-                        stackM =
-                            Dict.get "1" model.stacks
-                    in
-                    case stackM of
-                        Just stack ->
-                            let
-                                index =
-                                    findIndex (equals itemUnder) stack |> Maybe.withDefault -1
+                    if itemOver == itemUnder then
+                        model
 
-                                items =
-                                    stack
-                                        |> List.filter (notEquals itemOver)
-                                        |> insertInto index itemOver
-                            in
-                            { model | stacks = Dict.update "1" (\_ -> Just items) model.stacks }
+                    else
+                        let
+                            getStackByItem item =
+                                Dict.toList model.stacks
+                                    |> List.filter (\( _, value ) -> List.member item value)
+                                    |> List.head
+                                    |> Maybe.withDefault ( "NOT_FOUND", [] )
 
-                        Nothing ->
-                            model
+                            updateStack stackId items stacks =
+                                Dict.update stackId (\_ -> Just items) stacks
+
+                            removeItem item items =
+                                List.filter (notEquals item) items
+
+                            ( fromStackId, fromStackItems ) =
+                                getStackByItem itemOver
+
+                            ( toStackId, toStackItems ) =
+                                getStackByItem itemUnder
+
+                            targetIndex =
+                                log "targetIndex" (findIndex (equals itemUnder) toStackItems |> Maybe.withDefault -1)
+
+                            without =
+                                updateStack fromStackId (removeItem itemOver fromStackItems) model.stacks
+
+                            with =
+                                updateStack toStackId (insertInto targetIndex itemOver toStackItems) without
+                        in
+                        { model | stacks = with }
 
         DragStart item ->
             { model | itemBeingDragged = Just item }
