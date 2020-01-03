@@ -94,9 +94,6 @@ update msg model =
                             updateStack stackId updater stacks =
                                 Dict.update stackId (Maybe.map (\v -> updater v)) stacks
 
-                            removeItem item items =
-                                List.filter (notEquals item) items
-
                             ( fromStackId, _ ) =
                                 getStackByItem itemOver
 
@@ -134,6 +131,10 @@ insertInto index item ary =
     [ left, right ]
         |> List.concat
 
+removeItem : item -> List item -> List item
+removeItem item items =
+    List.filter (notEquals item) items
+
 
 equals : val -> val -> Bool
 equals a b =
@@ -157,6 +158,7 @@ view model =
     in
     div [ onDragOver Noop, class "board" ]
         (Dict.toList model.stacks |> List.map (viewStack dragId))
+
 
 viewStack : String -> ( String, List String ) -> Html Msg
 viewStack dragId ( stackId, items ) =
