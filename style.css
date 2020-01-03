@@ -58,9 +58,11 @@ h1 {
 .board{
   display: flex;
   flex-direction: row;
+  align-items: flex-start;
 }
 
 .column{
-  background-color: azure;
+  padding: 1em;
+  background-color: cadetblue;
   margin-left: 1em;
 }
