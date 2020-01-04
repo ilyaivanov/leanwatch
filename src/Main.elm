@@ -37,14 +37,27 @@ updateWithStorage msg model =
 
 type alias Model =
     { stacks : Dict String (List String)
-    , itemBeingDragged : Maybe String
+    , stacksOrder : List String
+    , dragState : DragState
     }
+
+
+type DragState
+    = NoDrag
+    | MouseOverStackDragHandler String
+    | DraggingStack String
+    | DraggingItem String
 
 
 type Msg
     = OnDragOver String
     | DragStart String
     | DragEnd
+    | EnableDragForStack String
+    | DisableDragForStack
+    | OnStackDragOver String
+    | OnStackDragStart
+    | OnStackDragEnd
     | Noop
 
 
@@ -54,8 +67,11 @@ init _ =
             Dict.fromList
                 [ ( "1", createItems 1 7 )
                 , ( "2", createItems 8 12 )
+                , ( "42", createItems 42 44 )
+                , ( "Empty", [] )
                 ]
-      , itemBeingDragged = Nothing
+      , stacksOrder = [ "1", "42", "2", "Empty" ]
+      , dragState = NoDrag
       }
     , Cmd.none
     )
@@ -66,6 +82,46 @@ createItems from to =
     List.map (\n -> "Item " ++ String.fromInt n) (List.range from to)
 
 
+isDraggingStack : DragState -> String -> Bool
+isDraggingStack dragState stackId =
+    case dragState of
+        DraggingStack stackBeingDragged ->
+            stackBeingDragged == stackId
+
+        _ ->
+            False
+
+
+isDraggingItem : DragState -> String -> Bool
+isDraggingItem dragState itemId =
+    case dragState of
+        DraggingItem itemBeingDragged ->
+            itemBeingDragged == itemId
+
+        _ ->
+            False
+
+
+isDraggingAnyItem : DragState -> Bool
+isDraggingAnyItem dragState =
+    case dragState of
+        DraggingItem _ ->
+            True
+
+        _ ->
+            False
+
+
+isStackReadyForDrag : DragState -> String -> Bool
+isStackReadyForDrag dragState stackId =
+    case dragState of
+        MouseOverStackDragHandler stackOverMouse ->
+            stackOverMouse == stackId
+
+        _ ->
+            False
+
+
 
 -- UPDATE
 
@@ -73,40 +129,137 @@ createItems from to =
 update : Msg -> Model -> Model
 update msg model =
     case msg of
-        OnDragOver itemUnder ->
-            case model.itemBeingDragged of
-                Nothing ->
-                    model
-
-                Just itemOver ->
-                    let
-                        stackM =
-                            Dict.get "1" model.stacks
-                    in
-                    case stackM of
-                        Just stack ->
-                            let
-                                index =
-                                    findIndex (equals itemUnder) stack |> Maybe.withDefault -1
-
-                                items =
-                                    stack
-                                        |> List.filter (notEquals itemOver)
-                                        |> insertInto index itemOver
-                            in
-                            { model | stacks = Dict.update "1" (\_ -> Just items) model.stacks }
-
-                        Nothing ->
-                            model
-
         DragStart item ->
-            { model | itemBeingDragged = Just item }
+            { model | dragState = DraggingItem item }
 
         DragEnd ->
-            { model | itemBeingDragged = Nothing }
+            { model | dragState = NoDrag }
+
+        EnableDragForStack stackId ->
+            --For some reason onMouseEnter handler triggers during drag, ignore those events
+            -- if model.isStackDragging then
+            case model.dragState of
+                DraggingStack _ ->
+                    model
+
+                _ ->
+                    { model | dragState = MouseOverStackDragHandler (log "EnableDragForStack" stackId) }
+
+        DisableDragForStack ->
+            --For some reason onMouseLeave handler triggers during drag, ignore those events
+            case model.dragState of
+                DraggingStack _ ->
+                    model
+
+                _ ->
+                    { model | dragState = NoDrag }
+
+        OnStackDragEnd ->
+            { model | dragState = log "OnStackDragEnd" NoDrag }
+
+        OnDragOver itemUnder ->
+            case model.dragState of
+                DraggingItem itemOver ->
+                    if itemOver == itemUnder then
+                        model
+
+                    else
+                        let
+                            ( fromStackId, _ ) =
+                                getStackByItem itemOver model.stacks
+
+                            ( toStackId, toStackItems ) =
+                                getStackByItem itemUnder model.stacks
+
+                            targetIndex =
+                                findIndex (equals itemUnder) toStackItems |> Maybe.withDefault -1
+
+                            newStacks =
+                                model.stacks
+                                    |> updateStack fromStackId (removeItem itemOver)
+                                    |> updateStack toStackId (insertInto targetIndex itemOver)
+                        in
+                        { model | stacks = newStacks }
+
+                _ ->
+                    model
+
+        OnStackDragOver stackUnder ->
+            case model.dragState of
+                DraggingStack stackOver ->
+                    let
+                        targetIndex =
+                            findIndex (equals stackUnder) model.stacksOrder |> Maybe.withDefault -1
+
+                        stacksOrder =
+                            model.stacksOrder
+                                |> removeItem stackOver
+                                |> insertInto targetIndex stackOver
+                    in
+                    { model | stacksOrder = stacksOrder }
+
+                DraggingItem itemOver ->
+                    let
+                        ( fromStackId, fromItems ) =
+                            getStackByItem itemOver model.stacks
+
+                        ( toStackId, toItems ) =
+                            getStack stackUnder model.stacks
+                    in
+                    case findLastItem toItems of
+                        Just lastItem ->
+                            if lastItem == itemOver then
+                                model
+
+                            else
+                                { model
+                                    | stacks =
+                                        model.stacks
+                                            |> updateStack fromStackId (removeItem itemOver)
+                                            |> updateStack toStackId (\items -> List.append items [ itemOver ])
+                                }
+
+                        Nothing ->
+                            { model
+                                | stacks =
+                                    model.stacks
+                                        |> updateStack fromStackId (removeItem itemOver)
+                                        |> updateStack toStackId (\_ -> [ itemOver ])
+                            }
+
+                _ ->
+                    model
+
+        OnStackDragStart ->
+            case model.dragState of
+                MouseOverStackDragHandler stackId ->
+                    { model | dragState = DraggingStack stackId }
+
+                _ ->
+                    model
 
         Noop ->
             model
+
+
+updateStack : String -> (List String -> List String) -> Dict String (List String) -> Dict String (List String)
+updateStack stackId updater stacks =
+    Dict.update stackId (Maybe.map (\v -> updater v)) stacks
+
+
+getStackByItem : String -> Dict String (List String) -> ( String, List String )
+getStackByItem item stacks =
+    Dict.toList stacks
+        |> List.filter (\( _, value ) -> List.member item value)
+        |> List.head
+        |> Maybe.withDefault ( "NOT_FOUND", [] )
+
+
+getStack : String -> Dict String (List String) -> ( String, List String )
+getStack stackId stacks =
+    ( stackId
+    , Dict.get stackId stacks |> Maybe.withDefault []
+    )
 
 
 insertInto : Int -> item -> List item -> List item
@@ -119,6 +272,16 @@ insertInto index item ary =
     in
     [ left, right ]
         |> List.concat
+
+
+removeItem : item -> List item -> List item
+removeItem item items =
+    List.filter (notEquals item) items
+
+
+findLastItem : List item -> Maybe item
+findLastItem list =
+    List.drop (List.length list - 1) list |> List.head
 
 
 equals : val -> val -> Bool
@@ -137,22 +300,44 @@ notEquals a b =
 
 view : Model -> Html Msg
 view model =
-    let
-        dragId =
-            model.itemBeingDragged |> Maybe.withDefault ""
-    in
-    div [ onDragOver Noop, class "board" ]
-        [ viewStack "Stack 1" dragId (Dict.get "1" model.stacks |> Maybe.withDefault [])
-        , viewStack "Stack 2" dragId (Dict.get "2" model.stacks |> Maybe.withDefault [])
+    div [ onDragOver Noop, onMouseUp OnStackDragEnd, class "board" ]
+        (model.stacksOrder
+            |> List.map (\stackId -> ( stackId, Dict.get stackId model.stacks |> Maybe.withDefault [] ))
+            |> List.map (\( stackId, stackM ) -> viewStack model.dragState ( stackId, stackM ))
+        )
+
+
+viewStack : DragState -> ( String, List String ) -> Html Msg
+viewStack dragState ( stackId, items ) =
+    div [ class "column-drag-overlay", onDragOver (OnStackDragOver stackId) ]
+        [ div
+            [ class ("column" ++ classIf (isDraggingStack dragState stackId) "column-preview")
+            , draggable (boolToString (isStackReadyForDrag dragState stackId))
+            , onDragStart OnStackDragStart
+            , onDragEnd OnStackDragEnd
+            , onDragOverCustom Noop (isDraggingAnyItem dragState)
+            ]
+            [ div [ class "column-title", onMouseLeave DisableDragForStack, onMouseEnter (EnableDragForStack stackId) ]
+                [ span [] [ text ("Stack " ++ stackId) ]
+                ]
+            , div []
+                (if List.isEmpty items then
+                    [ div [ class "item-placeholder", onDragOver (OnStackDragOver stackId) ] [] ]
+
+                 else
+                    List.map (\item -> viewItem (isDraggingItem dragState item) item) items
+                )
+            ]
         ]
 
 
-viewStack : String -> String -> List String -> Html Msg
-viewStack stackName dragId items =
-    div [ class "column" ]
-        [ h2 [] [ text stackName ]
-        , div [] (List.map (\item -> viewItem (item == dragId) item) items)
-        ]
+boolToString : Bool -> String
+boolToString cond =
+    if cond then
+        "true"
+
+    else
+        "false"
 
 
 viewItem : Bool -> String -> Html Msg
@@ -189,7 +374,12 @@ classIf condition class =
 
 onDragOver : msg -> Attribute msg
 onDragOver msg =
-    preventDefaultOn "dragover" (Decode.succeed (alwaysPreventDefault msg))
+    custom "dragover" (Decode.succeed { message = msg, stopPropagation = True, preventDefault = True })
+
+
+onDragOverCustom : msg -> Bool -> Attribute msg
+onDragOverCustom msg stopPropagation =
+    custom "dragover" (Decode.succeed { message = msg, stopPropagation = stopPropagation, preventDefault = True })
 
 
 onDragStart : msg -> Attribute msg
