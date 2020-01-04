@@ -49,19 +49,41 @@ h1 {
   border: 1px solid grey;
 }
 
+.item-placeholder{
+  height: 40px;
+  width: 120px;
+  background-color: rgb(234, 253, 205);
+}
+
 .item-preview {
   border: 2px dashed grey;
   color: rgba(0, 0, 0, 0);
 }
 
-.board{
+.board {
   display: flex;
   flex-direction: row;
-  align-items: flex-start;
+  align-items: stretch;
+  height: 100vh;
 }
 
-.column{
+.column {
   padding: 1em;
   background-color: cadetblue;
+  max-height: 100vh;
+  overflow: auto;
+}
+
+.column-title {
+  cursor: pointer;
+  background-color: rgb(234, 253, 205);
+}
+
+.column-preview {
+  opacity: 0.4;
+}
+
+.column-drag-overlay {
   margin-left: 1em;
+  background-color: rgb(234, 253, 205);
 }
