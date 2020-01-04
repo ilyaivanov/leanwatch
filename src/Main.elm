@@ -44,21 +44,19 @@ type alias Model =
 
 type DragState
     = NoDrag
-    | MouseOverStackDragHandler String
-    | DraggingStack String
-    | DraggingItem String
+    | DraggingItem MouseMoveEvent Offsets String
+    | DraggingStack MouseMoveEvent Offsets String
 
 
 type Msg
-    = OnDragOver String
-    | DragStart String
-    | DragEnd
-    | EnableDragForStack String
-    | DisableDragForStack
-    | OnStackDragOver String
-    | OnStackDragStart
-    | OnStackDragEnd
-    | Noop
+    = Noop
+    | StackTitleMouseDown String MouseDownEvent
+    | ItemMouseDown String MouseDownEvent
+    | MouseMove MouseMoveEvent
+    | MouseUp
+    | StackOverlayEnterDuringDrag String
+    | StackEnterDuringDrag String
+    | ItemEnterDuringDrag String
 
 
 init : Maybe () -> ( Model, Cmd Msg )
@@ -85,7 +83,7 @@ createItems from to =
 isDraggingStack : DragState -> String -> Bool
 isDraggingStack dragState stackId =
     case dragState of
-        DraggingStack stackBeingDragged ->
+        DraggingStack _ _ stackBeingDragged ->
             stackBeingDragged == stackId
 
         _ ->
@@ -95,7 +93,7 @@ isDraggingStack dragState stackId =
 isDraggingItem : DragState -> String -> Bool
 isDraggingItem dragState itemId =
     case dragState of
-        DraggingItem itemBeingDragged ->
+        DraggingItem _ _ itemBeingDragged ->
             itemBeingDragged == itemId
 
         _ ->
@@ -105,21 +103,21 @@ isDraggingItem dragState itemId =
 isDraggingAnyItem : DragState -> Bool
 isDraggingAnyItem dragState =
     case dragState of
-        DraggingItem _ ->
+        DraggingItem _ _ _ ->
             True
 
         _ ->
             False
 
 
-isStackReadyForDrag : DragState -> String -> Bool
-isStackReadyForDrag dragState stackId =
+isDraggingAnything : DragState -> Bool
+isDraggingAnything dragState =
     case dragState of
-        MouseOverStackDragHandler stackOverMouse ->
-            stackOverMouse == stackId
+        NoDrag ->
+            False
 
         _ ->
-            False
+            True
 
 
 
@@ -129,37 +127,33 @@ isStackReadyForDrag dragState stackId =
 update : Msg -> Model -> Model
 update msg model =
     case msg of
-        DragStart item ->
-            { model | dragState = DraggingItem item }
+        ItemMouseDown itemId { mousePosition, offsets } ->
+            { model | dragState = DraggingItem mousePosition offsets itemId }
 
-        DragEnd ->
+        MouseUp ->
             { model | dragState = NoDrag }
 
-        EnableDragForStack stackId ->
-            --For some reason onMouseEnter handler triggers during drag, ignore those events
-            -- if model.isStackDragging then
-            case model.dragState of
-                DraggingStack _ ->
-                    model
+        StackTitleMouseDown stackId { mousePosition, offsets } ->
+            { model | dragState = DraggingStack mousePosition offsets stackId }
 
-                _ ->
-                    { model | dragState = MouseOverStackDragHandler (log "EnableDragForStack" stackId) }
+        MouseMove newMousePosition ->
+            case ( model.dragState, newMousePosition.buttons ) of
+                ( DraggingStack _ offsets id, 1 ) ->
+                    { model | dragState = DraggingStack newMousePosition offsets id }
 
-        DisableDragForStack ->
-            --For some reason onMouseLeave handler triggers during drag, ignore those events
-            case model.dragState of
-                DraggingStack _ ->
-                    model
+                ( DraggingItem _ offsets id, 1 ) ->
+                    { model | dragState = DraggingItem newMousePosition offsets id }
 
-                _ ->
+                -- Any registered mouse move without mouse pressed is ending eny drag session
+                ( _, 0 ) ->
                     { model | dragState = NoDrag }
 
-        OnStackDragEnd ->
-            { model | dragState = log "OnStackDragEnd" NoDrag }
+                _ ->
+                    model
 
-        OnDragOver itemUnder ->
+        ItemEnterDuringDrag itemUnder ->
             case model.dragState of
-                DraggingItem itemOver ->
+                DraggingItem _ _ itemOver ->
                     if itemOver == itemUnder then
                         model
 
@@ -184,23 +178,22 @@ update msg model =
                 _ ->
                     model
 
-        OnStackDragOver stackUnder ->
+        StackEnterDuringDrag stackUnder ->
             case model.dragState of
-                DraggingStack stackOver ->
-                    let
-                        targetIndex =
-                            findIndex (equals stackUnder) model.stacksOrder |> Maybe.withDefault -1
+                DraggingStack _ _ stackOver ->
+                    { model | stacksOrder = moveStackToAnotherPosition model stackOver stackUnder }
 
-                        stacksOrder =
-                            model.stacksOrder
-                                |> removeItem stackOver
-                                |> insertInto targetIndex stackOver
-                    in
-                    { model | stacksOrder = stacksOrder }
+                _ ->
+                    model
 
-                DraggingItem itemOver ->
+        StackOverlayEnterDuringDrag stackUnder ->
+            case model.dragState of
+                DraggingStack _ _ stackOver ->
+                    { model | stacksOrder = moveStackToAnotherPosition model stackOver stackUnder }
+
+                DraggingItem _ _ itemOver ->
                     let
-                        ( fromStackId, fromItems ) =
+                        ( fromStackId, _ ) =
                             getStackByItem itemOver model.stacks
 
                         ( toStackId, toItems ) =
@@ -230,16 +223,18 @@ update msg model =
                 _ ->
                     model
 
-        OnStackDragStart ->
-            case model.dragState of
-                MouseOverStackDragHandler stackId ->
-                    { model | dragState = DraggingStack stackId }
-
-                _ ->
-                    model
-
         Noop ->
             model
+
+
+moveStackToAnotherPosition model stackOver stackUnder =
+    let
+        targetIndex =
+            findIndex (equals stackUnder) model.stacksOrder |> Maybe.withDefault -1
+    in
+    model.stacksOrder
+        |> removeItem stackOver
+        |> insertInto targetIndex stackOver
 
 
 updateStack : String -> (List String -> List String) -> Dict String (List String) -> Dict String (List String)
@@ -300,44 +295,45 @@ notEquals a b =
 
 view : Model -> Html Msg
 view model =
-    div [ onDragOver Noop, onMouseUp OnStackDragEnd, class "board" ]
-        (model.stacksOrder
-            |> List.map (\stackId -> ( stackId, Dict.get stackId model.stacks |> Maybe.withDefault [] ))
-            |> List.map (\( stackId, stackM ) -> viewStack model.dragState ( stackId, stackM ))
+    div (List.append [ class ("board" ++ classIf (isDraggingAnything model.dragState) "board-during-drag"), onMouseUp MouseUp ] (getOnMouseMoveEventHandler model))
+        (List.append
+            (model.stacksOrder
+                |> List.map (\stackId -> ( stackId, Dict.get stackId model.stacks |> Maybe.withDefault [] ))
+                |> List.map (\( stackId, stackM ) -> viewStack model.dragState [class "column-board"] ( stackId, stackM ))
+            )
+            [ viewElementBeingDragged model ]
         )
 
 
-viewStack : DragState -> ( String, List String ) -> Html Msg
-viewStack dragState ( stackId, items ) =
-    div [ class "column-drag-overlay", onDragOver (OnStackDragOver stackId) ]
+getOnMouseMoveEventHandler model =
+    case model.dragState of
+        NoDrag ->
+            []
+
+        _ ->
+            [ onMouseMove MouseMove ]
+
+
+viewStack : DragState -> List (Attribute Msg) -> ( String, List String ) -> Html Msg
+viewStack dragState attributes ( stackId, items ) =
+    div (List.append [ class "column-drag-overlay" ] attributes)
         [ div
             [ class ("column" ++ classIf (isDraggingStack dragState stackId) "column-preview")
-            , draggable (boolToString (isStackReadyForDrag dragState stackId))
-            , onDragStart OnStackDragStart
-            , onDragEnd OnStackDragEnd
-            , onDragOverCustom Noop (isDraggingAnyItem dragState)
+            , onMouseEnter (StackEnterDuringDrag stackId)
             ]
-            [ div [ class "column-title", onMouseLeave DisableDragForStack, onMouseEnter (EnableDragForStack stackId) ]
+            [ div [ class "column-title", onMouseDown (StackTitleMouseDown stackId) ]
                 [ span [] [ text ("Stack " ++ stackId) ]
                 ]
-            , div []
+            , div [class "column-content"]
                 (if List.isEmpty items then
-                    [ div [ class "empty-stack-placeholder", onDragOver (OnStackDragOver stackId) ] [] ]
+                    [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag stackId) ] [] ]
 
                  else
                     List.map (\item -> viewItem (isDraggingItem dragState item) item) items
                 )
             ]
+        , div [ class "column-footer", onMouseEnter (StackOverlayEnterDuringDrag stackId) ] []
         ]
-
-
-boolToString : Bool -> String
-boolToString cond =
-    if cond then
-        "true"
-
-    else
-        "false"
 
 
 viewItem : Bool -> String -> Html Msg
@@ -347,12 +343,32 @@ viewItem isDragging item =
             ("item"
                 ++ classIf isDragging "item-preview"
             )
-        , onDragOver (OnDragOver item)
-        , onDragStart (DragStart item)
-        , onDragEnd DragEnd
-        , draggable "true"
+        , onMouseDown (ItemMouseDown item)
+        , onMouseEnter (ItemEnterDuringDrag item)
         ]
         [ text item ]
+
+
+viewElementBeingDragged model =
+    case model.dragState of
+        DraggingItem mouseMoveEvent offsets itemId ->
+            div
+                [ class "item item-dragged"
+                , style "left" (String.fromInt (mouseMoveEvent.pageX - offsets.offsetX) ++ "px")
+                , style "top" (String.fromInt (mouseMoveEvent.pageY - offsets.offsetY) ++ "px")
+                ]
+                [ text itemId ]
+
+        DraggingStack mouseMoveEvent offsets stackId ->
+            viewStack NoDrag
+                [ class "item-dragged"
+                , style "left" (String.fromInt (mouseMoveEvent.pageX - offsets.offsetX) ++ "px")
+                , style "top" (String.fromInt (mouseMoveEvent.pageY - offsets.offsetY) ++ "px")
+                ]
+                (getStack stackId model.stacks)
+
+        _ ->
+            div [] [ text "no item is being dragged" ]
 
 
 
@@ -372,36 +388,60 @@ classIf condition class =
 -- HTML EVENTS DECODERS
 
 
-onDragOver : msg -> Attribute msg
-onDragOver msg =
-    custom "dragover" (Decode.succeed { message = msg, stopPropagation = True, preventDefault = True })
+type alias MouseMoveEvent =
+    { pageX : Int
+    , pageY : Int
+    , buttons : Int
+    }
 
 
-onDragOverCustom : msg -> Bool -> Attribute msg
-onDragOverCustom msg stopPropagation =
-    custom "dragover" (Decode.succeed { message = msg, stopPropagation = stopPropagation, preventDefault = True })
+type alias Offsets =
+    { offsetX : Int
+    , offsetY : Int
+    }
 
 
-onDragStart : msg -> Attribute msg
-onDragStart msg =
-    on "dragstart" (Decode.succeed msg)
+type alias MouseDownEvent =
+    { offsets : Offsets
+    , mousePosition : MouseMoveEvent
+    }
 
 
-onDragEnd : msg -> Attribute msg
-onDragEnd msg =
-    preventDefaultOn "dragend" (Decode.succeed (alwaysPreventDefault msg))
+onMouseMove : (MouseMoveEvent -> msg) -> Attribute msg
+onMouseMove tagger =
+    on "mousemove" (Decode.map tagger mouseMoveDecoder)
 
 
-alwaysPreventDefault : msg -> ( msg, Bool )
-alwaysPreventDefault msg =
-    ( msg, True )
+onMouseDown : (MouseDownEvent -> msg) -> Attribute msg
+onMouseDown tagger =
+    on "mousedown" (Decode.map tagger mouseDownDecoder)
 
 
+onMouseUp : msg -> Attribute msg
+onMouseUp tagger =
+    on "mouseup" (Decode.succeed tagger)
 
--- this might be usefull if I decide to implement swapping strategy based on cursot offsetY and element height
--- current problem is that I don't know how to decode event and prevent default as well
--- pointDecoder : Decode.Decoder DragOver
--- pointDecoder =
---     Decode.map2 DragOver
---         (Decode.field "offsetY" Decode.int)
---         (Decode.at [ "target", "offsetHeight" ] Decode.int)
+
+onMouseEnter : msg -> Attribute msg
+onMouseEnter tagger =
+    on "mouseenter" (Decode.succeed tagger)
+
+
+mouseDownDecoder : Decode.Decoder MouseDownEvent
+mouseDownDecoder =
+    Decode.map2 MouseDownEvent offsetsDecoder mouseMoveDecoder
+
+
+mouseMoveDecoder : Decode.Decoder MouseMoveEvent
+mouseMoveDecoder =
+    Decode.map3 MouseMoveEvent
+        (Decode.field "pageX" Decode.int)
+        (Decode.field "pageY" Decode.int)
+        (Decode.field "buttons" Decode.int)
+
+
+offsetsDecoder : Decode.Decoder Offsets
+offsetsDecoder =
+    Decode.map2 Offsets
+        (Decode.field "offsetX" Decode.int)
+        (Decode.field "offsetY" Decode.int)
