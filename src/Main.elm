@@ -322,7 +322,7 @@ viewStack dragState ( stackId, items ) =
                 ]
             , div []
                 (if List.isEmpty items then
-                    [ div [ class "item-placeholder", onDragOver (OnStackDragOver stackId) ] [] ]
+                    [ div [ class "empty-stack-placeholder", onDragOver (OnStackDragOver stackId) ] [] ]
 
                  else
                     List.map (\item -> viewItem (isDraggingItem dragState item) item) items
