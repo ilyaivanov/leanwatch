@@ -76,6 +76,7 @@ h1 {
 }
 
 .column-title {
+  user-select: none;
   cursor: pointer;
   background-color: rgb(234, 253, 205);
 }
