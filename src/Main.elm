@@ -295,36 +295,31 @@ notEquals a b =
 
 view : Model -> Html Msg
 view model =
-    div (List.append [ class ("board" ++ classIf (isDraggingAnything model.dragState) "board-during-drag"), onMouseUp MouseUp ] (getOnMouseMoveEventHandler model))
+    div
+        (List.append
+            [ class "board", classIf (isDraggingAnything model.dragState) "board-during-drag", onMouseUp MouseUp ]
+            (attributeIf (isDraggingAnything model.dragState) (onMouseMove MouseMove))
+        )
         (List.append
             (model.stacksOrder
                 |> List.map (\stackId -> ( stackId, Dict.get stackId model.stacks |> Maybe.withDefault [] ))
-                |> List.map (\( stackId, stackM ) -> viewStack model.dragState [class "column-board"] ( stackId, stackM ))
+                |> List.map (\( stackId, stackM ) -> viewStack model.dragState [ class "column-board" ] ( stackId, stackM ))
             )
             [ viewElementBeingDragged model ]
         )
-
-
-getOnMouseMoveEventHandler model =
-    case model.dragState of
-        NoDrag ->
-            []
-
-        _ ->
-            [ onMouseMove MouseMove ]
-
 
 viewStack : DragState -> List (Attribute Msg) -> ( String, List String ) -> Html Msg
 viewStack dragState attributes ( stackId, items ) =
     div (List.append [ class "column-drag-overlay" ] attributes)
         [ div
-            [ class ("column" ++ classIf (isDraggingStack dragState stackId) "column-preview")
+            [ class "column"
+            , classIf (isDraggingStack dragState stackId) "column-preview"
             , onMouseEnter (StackEnterDuringDrag stackId)
             ]
             [ div [ class "column-title", onMouseDown (StackTitleMouseDown stackId) ]
                 [ span [] [ text ("Stack " ++ stackId) ]
                 ]
-            , div [class "column-content"]
+            , div [ class "column-content" ]
                 (if List.isEmpty items then
                     [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag stackId) ] [] ]
 
@@ -339,10 +334,8 @@ viewStack dragState attributes ( stackId, items ) =
 viewItem : Bool -> String -> Html Msg
 viewItem isDragging item =
     div
-        [ class
-            ("item"
-                ++ classIf isDragging "item-preview"
-            )
+        [ class "item"
+        , classIf isDragging "item-preview"
         , onMouseDown (ItemMouseDown item)
         , onMouseEnter (ItemEnterDuringDrag item)
         ]
@@ -368,20 +361,29 @@ viewElementBeingDragged model =
                 (getStack stackId model.stacks)
 
         _ ->
-            div [] [ text "no item is being dragged" ]
+            div [] [ ]
 
 
 
 -- CSS HELPERS
 
 
-classIf : Bool -> String -> String
-classIf condition class =
+classIf : Bool -> String -> Attribute msg
+classIf condition className =
     if condition then
-        " " ++ class
+        class className
 
     else
-        ""
+        class ""
+
+
+attributeIf : Bool -> Attribute msg -> List (Attribute msg)
+attributeIf condition attribute =
+    if condition then
+        [ attribute ]
+
+    else
+        []
 
 
 
