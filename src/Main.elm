@@ -341,14 +341,11 @@ notEquals a b =
 
 view : Model -> Html Msg
 view model =
-    div []
+    div (attributeIf (isDraggingAnything model.dragState) (onMouseMove MouseMove))
         [ viewSidebar model.dragState (getSearchItems model)
         , div [ class "page-content" ]
             [ div
-                (List.append
-                    [ class "board", classIf (isDraggingAnything model.dragState) "board-during-drag", onMouseUp MouseUp ]
-                    (attributeIf (isDraggingAnything model.dragState) (onMouseMove MouseMove))
-                )
+                [ class "board", classIf (isDraggingAnything model.dragState) "board-during-drag", onMouseUp MouseUp ]
                 (List.append
                     (model.stacksOrder
                         |> List.map (\stackId -> ( stackId, Dict.get stackId model.stacks |> Maybe.withDefault [] ))

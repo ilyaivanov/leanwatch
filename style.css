@@ -1,5 +1,6 @@
 :root {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  user-select: none;
 }
 
 body {
@@ -13,6 +14,7 @@ body {
 .sidebar{
   float: left;
   background-color: aquamarine;
+  overflow: auto;
   width: 200px;
   height: 100vh;
 }
@@ -64,7 +66,6 @@ body {
   flex-direction: row;
   align-items: stretch;
   height: 100vh;
-  user-select: none;
 }
 
 .board-during-drag {
