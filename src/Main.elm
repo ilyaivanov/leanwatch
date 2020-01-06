@@ -8,7 +8,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Json.Decode as Decode
 import List.Extra exposing (findIndex, splitAt)
-
+import ExtraEvents exposing (..)
 
 main : Program (Maybe ()) Model Msg
 main =
@@ -39,6 +39,7 @@ type alias Model =
     { stacks : Dict String (List String)
     , stacksOrder : List String
     , dragState : DragState
+    , searchTerm : String
     }
 
 
@@ -60,6 +61,7 @@ type Msg
     | ItemEnterDuringDrag String
       --Board
     | CreateStack
+    | OnSearchInput String
 
 
 init : Maybe () -> ( Model, Cmd Msg )
@@ -74,14 +76,20 @@ init _ =
                 ]
       , stacksOrder = [ "1", "42", "2", "Empty" ]
       , dragState = NoDrag
+      , searchTerm = ""
       }
     , Cmd.none
     )
 
 
 createItems : Int -> Int -> List String
-createItems from to =
-    List.map (\n -> "Item " ++ String.fromInt n) (List.range from to)
+createItems =
+    createItemsWithPostfix ""
+
+
+createItemsWithPostfix : String -> Int -> Int -> List String
+createItemsWithPostfix postfix from to =
+    List.map (\n -> "Item " ++ String.fromInt n ++ postfix) (List.range from to)
 
 
 isDraggingStack : DragState -> String -> Bool
@@ -242,6 +250,12 @@ update msg model =
                 , stacks = Dict.insert newStackId [] model.stacks
             }
 
+        OnSearchInput val ->
+            { model
+                | searchTerm = val
+                , stacks = Dict.update "SEARCH" (\_ -> Just (createItemsWithPostfix val 15 25)) model.stacks
+            }
+
         Noop ->
             model
 
@@ -342,7 +356,7 @@ notEquals a b =
 view : Model -> Html Msg
 view model =
     div (attributeIf (isDraggingAnything model.dragState) (onMouseMove MouseMove))
-        [ viewSidebar model.dragState (getSearchItems model)
+        [ viewSidebar model
         , div [ class "page-content" ]
             [ div
                 [ class "board", classIf (isDraggingAnything model.dragState) "board-during-drag", onMouseUp MouseUp ]
@@ -380,10 +394,12 @@ viewStack dragState attributes ( stackId, items ) =
         ]
 
 
-viewSidebar : DragState -> List String -> Html Msg
-viewSidebar dragState items =
+viewSidebar : Model -> Html Msg
+viewSidebar model =
     div [ class "sidebar" ]
-        (List.map (\item -> viewItem (isDraggingItem dragState item) item) items)
+        [ input [ onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
+        , div [] (List.map (\item -> viewItem (isDraggingItem model.dragState item) item) (getSearchItems model))
+        ]
 
 
 viewItem : Bool -> String -> Html Msg
@@ -439,66 +455,3 @@ attributeIf condition attribute =
 
     else
         []
-
-
-
--- HTML EVENTS DECODERS
-
-
-type alias MouseMoveEvent =
-    { pageX : Int
-    , pageY : Int
-    , buttons : Int
-    }
-
-
-type alias Offsets =
-    { offsetX : Int
-    , offsetY : Int
-    }
-
-
-type alias MouseDownEvent =
-    { offsets : Offsets
-    , mousePosition : MouseMoveEvent
-    }
-
-
-onMouseMove : (MouseMoveEvent -> msg) -> Attribute msg
-onMouseMove tagger =
-    on "mousemove" (Decode.map tagger mouseMoveDecoder)
-
-
-onMouseDown : (MouseDownEvent -> msg) -> Attribute msg
-onMouseDown tagger =
-    on "mousedown" (Decode.map tagger mouseDownDecoder)
-
-
-onMouseUp : msg -> Attribute msg
-onMouseUp tagger =
-    on "mouseup" (Decode.succeed tagger)
-
-
-onMouseEnter : msg -> Attribute msg
-onMouseEnter tagger =
-    on "mouseenter" (Decode.succeed tagger)
-
-
-mouseDownDecoder : Decode.Decoder MouseDownEvent
-mouseDownDecoder =
-    Decode.map2 MouseDownEvent offsetsDecoder mouseMoveDecoder
-
-
-mouseMoveDecoder : Decode.Decoder MouseMoveEvent
-mouseMoveDecoder =
-    Decode.map3 MouseMoveEvent
-        (Decode.field "pageX" Decode.int)
-        (Decode.field "pageY" Decode.int)
-        (Decode.field "buttons" Decode.int)
-
-
-offsetsDecoder : Decode.Decoder Offsets
-offsetsDecoder =
-    Decode.map2 Offsets
-        (Decode.field "offsetX" Decode.int)
-        (Decode.field "offsetY" Decode.int)
