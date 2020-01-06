@@ -1,7 +1,6 @@
 module Main exposing (main)
 
 import Browser
-import Debug exposing (log)
 import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes exposing (..)
