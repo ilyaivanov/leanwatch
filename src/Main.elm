@@ -50,6 +50,7 @@ type DragState
 
 type Msg
     = Noop
+      --DND events
     | StackTitleMouseDown String MouseDownEvent
     | ItemMouseDown String MouseDownEvent
     | MouseMove MouseMoveEvent
@@ -57,6 +58,8 @@ type Msg
     | StackOverlayEnterDuringDrag String
     | StackEnterDuringDrag String
     | ItemEnterDuringDrag String
+      --Board
+    | CreateStack
 
 
 init : Maybe () -> ( Model, Cmd Msg )
@@ -67,6 +70,7 @@ init _ =
                 , ( "2", createItems 8 12 )
                 , ( "42", createItems 42 44 )
                 , ( "Empty", [] )
+                , ( "SEARCH", createItems 15 25 )
                 ]
       , stacksOrder = [ "1", "42", "2", "Empty" ]
       , dragState = NoDrag
@@ -118,6 +122,11 @@ isDraggingAnything dragState =
 
         _ ->
             True
+
+
+getSearchItems : Model -> List String
+getSearchItems model =
+    model.stacks |> Dict.get "SEARCH" |> Maybe.withDefault []
 
 
 
@@ -223,6 +232,16 @@ update msg model =
                 _ ->
                     model
 
+        CreateStack ->
+            let
+                newStackId =
+                    getNextId (Dict.keys model.stacks)
+            in
+            { model
+                | stacksOrder = List.append model.stacksOrder [ newStackId ]
+                , stacks = Dict.insert newStackId [] model.stacks
+            }
+
         Noop ->
             model
 
@@ -274,6 +293,33 @@ removeItem item items =
     List.filter (notEquals item) items
 
 
+getNextId : List String -> String
+getNextId ids =
+    ids
+        |> List.map (Decode.decodeString Decode.int)
+        |> List.filterMap
+            (\v ->
+                case v of
+                    Result.Ok number ->
+                        Just number
+
+                    _ ->
+                        Nothing
+            )
+        |> List.maximum
+        |> increment
+        |> String.fromInt
+
+
+increment v =
+    case v of
+        Just value ->
+            value + 1
+
+        Nothing ->
+            1
+
+
 findLastItem : List item -> Maybe item
 findLastItem list =
     List.drop (List.length list - 1) list |> List.head
@@ -295,18 +341,24 @@ notEquals a b =
 
 view : Model -> Html Msg
 view model =
-    div
-        (List.append
-            [ class "board", classIf (isDraggingAnything model.dragState) "board-during-drag", onMouseUp MouseUp ]
-            (attributeIf (isDraggingAnything model.dragState) (onMouseMove MouseMove))
-        )
-        (List.append
-            (model.stacksOrder
-                |> List.map (\stackId -> ( stackId, Dict.get stackId model.stacks |> Maybe.withDefault [] ))
-                |> List.map (\( stackId, stackM ) -> viewStack model.dragState [ class "column-board" ] ( stackId, stackM ))
-            )
-            [ viewElementBeingDragged model ]
-        )
+    div []
+        [ viewSidebar model.dragState (getSearchItems model)
+        , div [ class "page-content" ]
+            [ div
+                (List.append
+                    [ class "board", classIf (isDraggingAnything model.dragState) "board-during-drag", onMouseUp MouseUp ]
+                    (attributeIf (isDraggingAnything model.dragState) (onMouseMove MouseMove))
+                )
+                (List.append
+                    (model.stacksOrder
+                        |> List.map (\stackId -> ( stackId, Dict.get stackId model.stacks |> Maybe.withDefault [] ))
+                        |> List.map (\( stackId, stackM ) -> viewStack model.dragState [ class "column-board" ] ( stackId, stackM ))
+                    )
+                    [ button [ class "add-stack-button", onClick CreateStack ] [ text "add" ], viewElementBeingDragged model ]
+                )
+            ]
+        ]
+
 
 viewStack : DragState -> List (Attribute Msg) -> ( String, List String ) -> Html Msg
 viewStack dragState attributes ( stackId, items ) =
@@ -329,6 +381,12 @@ viewStack dragState attributes ( stackId, items ) =
             ]
         , div [ class "column-footer", onMouseEnter (StackOverlayEnterDuringDrag stackId) ] []
         ]
+
+
+viewSidebar : DragState -> List String -> Html Msg
+viewSidebar dragState items =
+    div [ class "sidebar" ]
+        (List.map (\item -> viewItem (isDraggingItem dragState item) item) items)
 
 
 viewItem : Bool -> String -> Html Msg
@@ -361,7 +419,7 @@ viewElementBeingDragged model =
                 (getStack stackId model.stacks)
 
         _ ->
-            div [] [ ]
+            div [] []
 
 
 

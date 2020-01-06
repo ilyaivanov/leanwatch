@@ -10,6 +10,21 @@ body {
   box-sizing: border-box;
 }
 
+.sidebar{
+  float: left;
+  background-color: aquamarine;
+  width: 200px;
+  height: 100vh;
+}
+
+.page-content{
+  float: left;
+  background-color: lightblue;
+  width: calc(100vw - 200px);
+  overflow: auto;
+  height: 100vh;
+}
+
 .item {
   height: 50px;
   width: 120px;
@@ -39,9 +54,9 @@ body {
 
 .empty-stack-placeholder {
   margin-top: 1em;
-  height: 40px;
+  height: 20px;
   width: 120px;
-  background-color: rgb(234, 253, 205);
+  /* background-color: rgb(234, 253, 205); */
 }
 
 .board {
@@ -49,7 +64,6 @@ body {
   flex-direction: row;
   align-items: stretch;
   height: 100vh;
-  width: 100vw;
   user-select: none;
 }
 
@@ -72,10 +86,11 @@ body {
 }
 
 .column-title {
+  padding: 1em;
   height: 2em;
   user-select: none;
   cursor: pointer;
-  background-color: rgb(234, 253, 205);
+  /* background-color: rgb(234, 253, 205); */
 }
 
 .column-content {
@@ -93,5 +108,9 @@ body {
 
 .column-footer {
   flex: 1;
-  background-color: rgb(234, 253, 205);
+  /* background-color: rgb(234, 253, 205); */
+}
+
+.add-stack-button{
+  align-self: flex-start;
 }
