@@ -31,6 +31,7 @@ noComand model =
 
 type alias Model =
     { stacks : Dict String Stack
+    , items : Dict String Item
     , stacksOrder : List String
     , dragState : DragState
     , searchTerm : String
@@ -58,22 +59,20 @@ type Msg
     | OnSearchInput String
       --Commands
     | CreateSingleId
-
-
-
---| CreateMultipleId Int Msg
+    | OnSearchDone (List Float)
 
 
 init : Maybe () -> ( Model, Cmd Msg )
 init _ =
     ( { stacks =
             Dict.fromList
-                [ ( "1", Stack "1" "My Stack 1" (createItems 1 7) )
-                , ( "2", Stack "2" "My Stack 42" (createItems 8 12) )
-                , ( "42", Stack "42" "My Stack 2" (createItems 42 44) )
+                [ ( "1", Stack "1" "My Stack 1" (createItems 1 5) )
+                , ( "2", Stack "2" "My Stack 42" (createItems 6 10) )
+                , ( "42", Stack "42" "My Stack 2" (createItems 11 15) )
                 , ( "Empty", Stack "Empty" "My Stack Empty" [] )
-                , ( "SEARCH", Stack "SEARCH" "SEARCH_STACK" (createItems 50 55) )
+                , ( "SEARCH", Stack "SEARCH" "SEARCH_STACK" (createItems 16 20) )
                 ]
+      , items = Dict.fromList (List.range 1 20 |> List.map String.fromInt |> List.map (\id -> ( id, { id = id, name = "Item NEW " ++ id } )))
       , stacksOrder = [ "1", "42", "2", "Empty" ]
       , dragState = NoDrag
       , searchTerm = ""
@@ -89,14 +88,15 @@ type alias Stack =
     }
 
 
+type alias Item =
+    { id : String
+    , name : String
+    }
+
+
 createItems : Int -> Int -> List String
-createItems =
-    createItemsWithPostfix ""
-
-
-createItemsWithPostfix : String -> Int -> Int -> List String
-createItemsWithPostfix postfix from to =
-    List.map (\n -> "Item " ++ String.fromInt n ++ postfix) (List.range from to)
+createItems from to =
+    List.map (\n -> String.fromInt n) (List.range from to)
 
 
 isDraggingStack : DragState -> String -> Bool
@@ -109,11 +109,11 @@ isDraggingStack dragState stackId =
             False
 
 
-isDraggingItem : DragState -> String -> Bool
-isDraggingItem dragState itemId =
+isDraggingItem : DragState -> Item -> Bool
+isDraggingItem dragState { id } =
     case dragState of
         DraggingItem _ _ itemBeingDragged ->
-            itemBeingDragged == itemId
+            itemBeingDragged == id
 
         _ ->
             False
@@ -142,6 +142,17 @@ isDraggingAnything dragState =
 getSearchStack : Model -> Maybe Stack
 getSearchStack model =
     model.stacks |> Dict.get "SEARCH"
+
+
+getStackToView model stackId =
+    let
+        stack =
+            getStack stackId model.stacks
+
+        items =
+            stack.items |> List.map (\itemId -> Dict.get itemId model.items) |> unpackMaybes
+    in
+    ( stack, items )
 
 
 
@@ -279,18 +290,42 @@ update msg model =
                 }
 
         OnSearchInput val ->
-            noComand
-                { model
-                    | searchTerm = val
-                    , stacks = Dict.update "SEARCH" (\_ -> Just (Stack "SEARCH" "New Stack" (createItemsWithPostfix val 15 25))) model.stacks
-                }
+            ( { model
+                | searchTerm = val
+                , stacks = Dict.update "SEARCH" (\_ -> Just (Stack "SEARCH" "New Stack" (createItems 15 25))) model.stacks
+              }
+            , Random.generate OnSearchDone createIds
+            )
 
         CreateSingleId ->
-            ( model, Random.generate CreateStack (Random.float 0 1) )
+            ( model, Random.generate CreateStack createId )
+
+        OnSearchDone idsAsFloats ->
+            let
+                ids =
+                    idsAsFloats |> List.map String.fromFloat
+
+                newItems =
+                    ids |> List.map (\id -> Item id ("NEW ITEM" ++ String.slice 2 3 id))
+
+                newItemsDict =
+                    Dict.fromList (List.map (\i -> ( i.id, i )) newItems)
+
+                itemsUpdated =
+                    Dict.union newItemsDict model.items
+            in
+            noComand { model | stacks = Dict.update "SEARCH" (\_ -> Just (Stack "SEARCH" "New Stack" ids)) model.stacks, items = itemsUpdated }
 
         Noop ->
             noComand model
 
+
+createIds =
+    Random.list 10 createId
+
+
+createId =
+    Random.float 0 1
 
 
 unpackMaybes : List (Maybe item) -> List item
@@ -374,7 +409,7 @@ view model =
                     (model.stacksOrder
                         |> List.map (\stackId -> Dict.get stackId model.stacks)
                         |> unpackMaybes
-                        |> List.map (\stack -> viewStack model.dragState [ class "column-board" ] stack)
+                        |> List.map (\stack -> viewStack model.dragState [ class "column-board" ] (getStackToView model stack.id))
                     )
                     [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ], viewElementBeingDragged model ]
                 )
@@ -382,8 +417,8 @@ view model =
         ]
 
 
-viewStack : DragState -> List (Attribute Msg) -> Stack -> Html Msg
-viewStack dragState attributes {id, name, items} =
+viewStack : DragState -> List (Attribute Msg) -> ( Stack, List Item ) -> Html Msg
+viewStack dragState attributes ( { id, name }, items ) =
     div (List.append [ class "column-drag-overlay" ] attributes)
         [ div
             [ class "column"
@@ -408,8 +443,16 @@ viewStack dragState attributes {id, name, items} =
 viewSidebar : Model -> Html Msg
 viewSidebar model =
     let
+        stackM =
+            getSearchStack model
+
         items =
-            getSearchStack model |> Maybe.map (\s -> s.items) |> Maybe.withDefault []
+            case stackM of
+                Just stack ->
+                    stack.items |> List.map (\itemId -> Dict.get itemId model.items) |> unpackMaybes
+
+                Nothing ->
+                    []
     in
     div [ class "sidebar" ]
         [ input [ onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
@@ -417,15 +460,15 @@ viewSidebar model =
         ]
 
 
-viewItem : Bool -> String -> Html Msg
-viewItem isDragging item =
+viewItem : Bool -> Item -> Html Msg
+viewItem isDragging { id, name } =
     div
         [ class "item"
         , classIf isDragging "item-preview"
-        , onMouseDown (ItemMouseDown item)
-        , onMouseEnter (ItemEnterDuringDrag item)
+        , onMouseDown (ItemMouseDown id)
+        , onMouseEnter (ItemEnterDuringDrag id)
         ]
-        [ text item ]
+        [ text name ]
 
 
 viewElementBeingDragged model =
@@ -436,15 +479,19 @@ viewElementBeingDragged model =
                 , style "left" (String.fromInt (mouseMoveEvent.pageX - offsets.offsetX) ++ "px")
                 , style "top" (String.fromInt (mouseMoveEvent.pageY - offsets.offsetY) ++ "px")
                 ]
-                [ text itemId ]
+                [ text (model.items |> Dict.get itemId |> Maybe.withDefault (Item "1" "1")).name ]
 
         DraggingStack mouseMoveEvent offsets stackId ->
+            let
+                ( stack, items ) =
+                    getStackToView model stackId
+            in
             viewStack NoDrag
                 [ class "item-dragged"
                 , style "left" (String.fromInt (mouseMoveEvent.pageX - offsets.offsetX) ++ "px")
                 , style "top" (String.fromInt (mouseMoveEvent.pageY - offsets.offsetY) ++ "px")
                 ]
-                (getStack stackId model.stacks)
+                ( stack, items )
 
         _ ->
             div [] []
