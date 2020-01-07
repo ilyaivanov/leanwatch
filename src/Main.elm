@@ -30,7 +30,7 @@ noComand model =
 
 
 type alias Model =
-    { stacks : Dict String (List String)
+    { stacks : Dict String Stack
     , stacksOrder : List String
     , dragState : DragState
     , searchTerm : String
@@ -68,11 +68,11 @@ init : Maybe () -> ( Model, Cmd Msg )
 init _ =
     ( { stacks =
             Dict.fromList
-                [ ( "1", createItems 1 7 )
-                , ( "2", createItems 8 12 )
-                , ( "42", createItems 42 44 )
-                , ( "Empty", [] )
-                , ( "SEARCH", createItems 15 25 )
+                [ ( "1", Stack "1" "My Stack 1" (createItems 1 7) )
+                , ( "2", Stack "2" "My Stack 42" (createItems 8 12) )
+                , ( "42", Stack "42" "My Stack 2" (createItems 42 44) )
+                , ( "Empty", Stack "Empty" "My Stack Empty" [] )
+                , ( "SEARCH", Stack "SEARCH" "SEARCH_STACK" (createItems 50 55) )
                 ]
       , stacksOrder = [ "1", "42", "2", "Empty" ]
       , dragState = NoDrag
@@ -80,6 +80,13 @@ init _ =
       }
     , Cmd.none
     )
+
+
+type alias Stack =
+    { id : String
+    , name : String
+    , items : List String
+    }
 
 
 createItems : Int -> Int -> List String
@@ -132,9 +139,9 @@ isDraggingAnything dragState =
             True
 
 
-getSearchItems : Model -> List String
-getSearchItems model =
-    model.stacks |> Dict.get "SEARCH" |> Maybe.withDefault []
+getSearchStack : Model -> Maybe Stack
+getSearchStack model =
+    model.stacks |> Dict.get "SEARCH"
 
 
 
@@ -176,19 +183,28 @@ update msg model =
 
                     else
                         let
-                            ( fromStackId, _ ) =
+                            fromStack =
                                 getStackByItem itemOver model.stacks
 
-                            ( toStackId, toStackItems ) =
+                            toStack =
                                 getStackByItem itemUnder model.stacks
+
+                            fromStackId =
+                                fromStack.id
+
+                            toStackId =
+                                toStack.id
+
+                            toStackItems =
+                                toStack.items
 
                             targetIndex =
                                 findIndex (equals itemUnder) toStackItems |> Maybe.withDefault -1
 
                             newStacks =
                                 model.stacks
-                                    |> updateStack fromStackId (removeItem itemOver)
-                                    |> updateStack toStackId (insertInto targetIndex itemOver)
+                                    |> updateStack fromStackId (\s -> { s | items = removeItem itemOver s.items })
+                                    |> updateStack toStackId (\s -> { s | items = insertInto targetIndex itemOver s.items })
                         in
                         noComand { model | stacks = newStacks }
 
@@ -210,11 +226,20 @@ update msg model =
 
                 DraggingItem _ _ itemOver ->
                     let
-                        ( fromStackId, _ ) =
+                        fromStack =
                             getStackByItem itemOver model.stacks
 
-                        ( toStackId, toItems ) =
+                        toStack =
                             getStack stackUnder model.stacks
+
+                        fromStackId =
+                            fromStack.id
+
+                        toStackId =
+                            toStack.id
+
+                        toItems =
+                            toStack.items
                     in
                     case findLastItem toItems of
                         Just lastItem ->
@@ -226,8 +251,8 @@ update msg model =
                                     { model
                                         | stacks =
                                             model.stacks
-                                                |> updateStack fromStackId (removeItem itemOver)
-                                                |> updateStack toStackId (\items -> List.append items [ itemOver ])
+                                                |> updateStack fromStackId (\s -> { s | items = removeItem itemOver s.items })
+                                                |> updateStack toStackId (\s -> { s | items = List.append s.items [ itemOver ] })
                                     }
 
                         Nothing ->
@@ -235,8 +260,8 @@ update msg model =
                                 { model
                                     | stacks =
                                         model.stacks
-                                            |> updateStack fromStackId (removeItem itemOver)
-                                            |> updateStack toStackId (\_ -> [ itemOver ])
+                                            |> updateStack fromStackId (\s -> { s | items = removeItem itemOver s.items })
+                                            |> updateStack toStackId (\s -> { s | items = [ itemOver ] })
                                 }
 
                 _ ->
@@ -250,25 +275,27 @@ update msg model =
             noComand
                 { model
                     | stacksOrder = List.append model.stacksOrder [ newStackId ]
-                    , stacks = Dict.insert newStackId [] model.stacks
+                    , stacks = Dict.insert newStackId (Stack newStackId "New Stack" []) model.stacks
                 }
 
         OnSearchInput val ->
             noComand
                 { model
                     | searchTerm = val
-                    , stacks = Dict.update "SEARCH" (\_ -> Just (createItemsWithPostfix val 15 25)) model.stacks
+                    , stacks = Dict.update "SEARCH" (\_ -> Just (Stack "SEARCH" "New Stack" (createItemsWithPostfix val 15 25))) model.stacks
                 }
 
         CreateSingleId ->
-            ( model, Random.generate CreateStack probability )
+            ( model, Random.generate CreateStack (Random.float 0 1) )
 
         Noop ->
             noComand model
 
 
-probability =
-    Random.float 0 1
+
+unpackMaybes : List (Maybe item) -> List item
+unpackMaybes maybes =
+    List.filterMap identity maybes
 
 
 moveStackToAnotherPosition model stackOver stackUnder =
@@ -281,24 +308,23 @@ moveStackToAnotherPosition model stackOver stackUnder =
         |> insertInto targetIndex stackOver
 
 
-updateStack : String -> (List String -> List String) -> Dict String (List String) -> Dict String (List String)
+updateStack : String -> (Stack -> Stack) -> Dict String Stack -> Dict String Stack
 updateStack stackId updater stacks =
     Dict.update stackId (Maybe.map (\v -> updater v)) stacks
 
 
-getStackByItem : String -> Dict String (List String) -> ( String, List String )
+getStackByItem : String -> Dict String Stack -> Stack
 getStackByItem item stacks =
     Dict.toList stacks
-        |> List.filter (\( _, value ) -> List.member item value)
+        |> List.filter (\( _, stack ) -> List.member item stack.items)
+        |> List.map Tuple.second
         |> List.head
-        |> Maybe.withDefault ( "NOT_FOUND", [] )
+        |> Maybe.withDefault (Stack "NOT_FOUND" "NOT_FOUND" [])
 
 
-getStack : String -> Dict String (List String) -> ( String, List String )
+getStack : String -> Dict String Stack -> Stack
 getStack stackId stacks =
-    ( stackId
-    , Dict.get stackId stacks |> Maybe.withDefault []
-    )
+    Dict.get stackId stacks |> Maybe.withDefault (Stack "NOT_FOUND" "NOT_FOUND" [])
 
 
 insertInto : Int -> item -> List item -> List item
@@ -346,8 +372,9 @@ view model =
                 [ class "board", classIf (isDraggingAnything model.dragState) "board-during-drag", onMouseUp MouseUp ]
                 (List.append
                     (model.stacksOrder
-                        |> List.map (\stackId -> ( stackId, Dict.get stackId model.stacks |> Maybe.withDefault [] ))
-                        |> List.map (\( stackId, stackM ) -> viewStack model.dragState [ class "column-board" ] ( stackId, stackM ))
+                        |> List.map (\stackId -> Dict.get stackId model.stacks)
+                        |> unpackMaybes
+                        |> List.map (\stack -> viewStack model.dragState [ class "column-board" ] stack)
                     )
                     [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ], viewElementBeingDragged model ]
                 )
@@ -355,34 +382,38 @@ view model =
         ]
 
 
-viewStack : DragState -> List (Attribute Msg) -> ( String, List String ) -> Html Msg
-viewStack dragState attributes ( stackId, items ) =
+viewStack : DragState -> List (Attribute Msg) -> Stack -> Html Msg
+viewStack dragState attributes {id, name, items} =
     div (List.append [ class "column-drag-overlay" ] attributes)
         [ div
             [ class "column"
-            , classIf (isDraggingStack dragState stackId) "column-preview"
-            , onMouseEnter (StackEnterDuringDrag stackId)
+            , classIf (isDraggingStack dragState id) "column-preview"
+            , onMouseEnter (StackEnterDuringDrag id)
             ]
-            [ div [ class "column-title", onMouseDown (StackTitleMouseDown stackId) ]
-                [ span [] [ text ("Stack " ++ stackId) ]
+            [ div [ class "column-title", onMouseDown (StackTitleMouseDown id) ]
+                [ span [] [ text name ]
                 ]
             , div [ class "column-content" ]
                 (if List.isEmpty items then
-                    [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag stackId) ] [] ]
+                    [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag id) ] [] ]
 
                  else
                     List.map (\item -> viewItem (isDraggingItem dragState item) item) items
                 )
             ]
-        , div [ class "column-footer", onMouseEnter (StackOverlayEnterDuringDrag stackId) ] []
+        , div [ class "column-footer", onMouseEnter (StackOverlayEnterDuringDrag id) ] []
         ]
 
 
 viewSidebar : Model -> Html Msg
 viewSidebar model =
+    let
+        items =
+            getSearchStack model |> Maybe.map (\s -> s.items) |> Maybe.withDefault []
+    in
     div [ class "sidebar" ]
         [ input [ onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
-        , div [] (List.map (\item -> viewItem (isDraggingItem model.dragState item) item) (getSearchItems model))
+        , div [] (List.map (\item -> viewItem (isDraggingItem model.dragState item) item) items)
         ]
 
 
