@@ -1,7 +1,8 @@
 module ExtraEvents exposing (MouseDownEvent, MouseMoveEvent, Offsets, onMouseDown, onMouseEnter, onMouseMove, onMouseUp)
 
-import Html.Attributes exposing (..)
-
+import Html exposing (..)
+import Html.Events exposing (..)
+import Json.Decode as Decode
 
 type alias MouseMoveEvent =
     { pageX : Int

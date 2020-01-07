@@ -2,32 +2,27 @@ module Main exposing (main)
 
 import Browser
 import Dict exposing (Dict)
+import ExtraEvents exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (..)
-import Json.Decode as Decode
+import Html.Events exposing (onClick, onInput)
 import List.Extra exposing (findIndex, splitAt)
-import ExtraEvents exposing (..)
+import Random
+
 
 main : Program (Maybe ()) Model Msg
 main =
     Browser.document
         { init = init
         , view = \model -> { title = "Lean Watch", body = [ view model ] }
-        , update = updateWithStorage
+        , update = update
         , subscriptions = \_ -> Sub.none
         }
 
 
-updateWithStorage : Msg -> Model -> ( Model, Cmd Msg )
-updateWithStorage msg model =
-    let
-        newModel =
-            update msg model
-    in
-    ( newModel
-    , Cmd.none
-    )
+noComand : Model -> ( Model, Cmd Msg )
+noComand model =
+    ( model, Cmd.none )
 
 
 
@@ -59,8 +54,14 @@ type Msg
     | StackEnterDuringDrag String
     | ItemEnterDuringDrag String
       --Board
-    | CreateStack
+    | CreateStack Float
     | OnSearchInput String
+      --Commands
+    | CreateSingleId
+
+
+
+--| CreateMultipleId Int Msg
 
 
 init : Maybe () -> ( Model, Cmd Msg )
@@ -140,38 +141,38 @@ getSearchItems model =
 -- UPDATE
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ItemMouseDown itemId { mousePosition, offsets } ->
-            { model | dragState = DraggingItem mousePosition offsets itemId }
+            noComand { model | dragState = DraggingItem mousePosition offsets itemId }
 
         MouseUp ->
-            { model | dragState = NoDrag }
+            noComand { model | dragState = NoDrag }
 
         StackTitleMouseDown stackId { mousePosition, offsets } ->
-            { model | dragState = DraggingStack mousePosition offsets stackId }
+            noComand { model | dragState = DraggingStack mousePosition offsets stackId }
 
         MouseMove newMousePosition ->
             case ( model.dragState, newMousePosition.buttons ) of
                 ( DraggingStack _ offsets id, 1 ) ->
-                    { model | dragState = DraggingStack newMousePosition offsets id }
+                    noComand { model | dragState = DraggingStack newMousePosition offsets id }
 
                 ( DraggingItem _ offsets id, 1 ) ->
-                    { model | dragState = DraggingItem newMousePosition offsets id }
+                    noComand { model | dragState = DraggingItem newMousePosition offsets id }
 
                 -- Any registered mouse move without mouse pressed is ending eny drag session
                 ( _, 0 ) ->
-                    { model | dragState = NoDrag }
+                    noComand { model | dragState = NoDrag }
 
                 _ ->
-                    model
+                    noComand model
 
         ItemEnterDuringDrag itemUnder ->
             case model.dragState of
                 DraggingItem _ _ itemOver ->
                     if itemOver == itemUnder then
-                        model
+                        noComand model
 
                     else
                         let
@@ -189,23 +190,23 @@ update msg model =
                                     |> updateStack fromStackId (removeItem itemOver)
                                     |> updateStack toStackId (insertInto targetIndex itemOver)
                         in
-                        { model | stacks = newStacks }
+                        noComand { model | stacks = newStacks }
 
                 _ ->
-                    model
+                    noComand model
 
         StackEnterDuringDrag stackUnder ->
             case model.dragState of
                 DraggingStack _ _ stackOver ->
-                    { model | stacksOrder = moveStackToAnotherPosition model stackOver stackUnder }
+                    noComand { model | stacksOrder = moveStackToAnotherPosition model stackOver stackUnder }
 
                 _ ->
-                    model
+                    noComand model
 
         StackOverlayEnterDuringDrag stackUnder ->
             case model.dragState of
                 DraggingStack _ _ stackOver ->
-                    { model | stacksOrder = moveStackToAnotherPosition model stackOver stackUnder }
+                    noComand { model | stacksOrder = moveStackToAnotherPosition model stackOver stackUnder }
 
                 DraggingItem _ _ itemOver ->
                     let
@@ -218,45 +219,56 @@ update msg model =
                     case findLastItem toItems of
                         Just lastItem ->
                             if lastItem == itemOver then
-                                model
+                                noComand model
 
                             else
+                                noComand
+                                    { model
+                                        | stacks =
+                                            model.stacks
+                                                |> updateStack fromStackId (removeItem itemOver)
+                                                |> updateStack toStackId (\items -> List.append items [ itemOver ])
+                                    }
+
+                        Nothing ->
+                            noComand
                                 { model
                                     | stacks =
                                         model.stacks
                                             |> updateStack fromStackId (removeItem itemOver)
-                                            |> updateStack toStackId (\items -> List.append items [ itemOver ])
+                                            |> updateStack toStackId (\_ -> [ itemOver ])
                                 }
 
-                        Nothing ->
-                            { model
-                                | stacks =
-                                    model.stacks
-                                        |> updateStack fromStackId (removeItem itemOver)
-                                        |> updateStack toStackId (\_ -> [ itemOver ])
-                            }
-
                 _ ->
-                    model
+                    noComand model
 
-        CreateStack ->
+        CreateStack id ->
             let
                 newStackId =
-                    getNextId (Dict.keys model.stacks)
+                    String.fromFloat id
             in
-            { model
-                | stacksOrder = List.append model.stacksOrder [ newStackId ]
-                , stacks = Dict.insert newStackId [] model.stacks
-            }
+            noComand
+                { model
+                    | stacksOrder = List.append model.stacksOrder [ newStackId ]
+                    , stacks = Dict.insert newStackId [] model.stacks
+                }
 
         OnSearchInput val ->
-            { model
-                | searchTerm = val
-                , stacks = Dict.update "SEARCH" (\_ -> Just (createItemsWithPostfix val 15 25)) model.stacks
-            }
+            noComand
+                { model
+                    | searchTerm = val
+                    , stacks = Dict.update "SEARCH" (\_ -> Just (createItemsWithPostfix val 15 25)) model.stacks
+                }
+
+        CreateSingleId ->
+            ( model, Random.generate CreateStack probability )
 
         Noop ->
-            model
+            noComand model
+
+
+probability =
+    Random.float 0 1
 
 
 moveStackToAnotherPosition model stackOver stackUnder =
@@ -306,33 +318,6 @@ removeItem item items =
     List.filter (notEquals item) items
 
 
-getNextId : List String -> String
-getNextId ids =
-    ids
-        |> List.map (Decode.decodeString Decode.int)
-        |> List.filterMap
-            (\v ->
-                case v of
-                    Result.Ok number ->
-                        Just number
-
-                    _ ->
-                        Nothing
-            )
-        |> List.maximum
-        |> increment
-        |> String.fromInt
-
-
-increment v =
-    case v of
-        Just value ->
-            value + 1
-
-        Nothing ->
-            1
-
-
 findLastItem : List item -> Maybe item
 findLastItem list =
     List.drop (List.length list - 1) list |> List.head
@@ -364,7 +349,7 @@ view model =
                         |> List.map (\stackId -> ( stackId, Dict.get stackId model.stacks |> Maybe.withDefault [] ))
                         |> List.map (\( stackId, stackM ) -> viewStack model.dragState [ class "column-board" ] ( stackId, stackM ))
                     )
-                    [ button [ class "add-stack-button", onClick CreateStack ] [ text "add" ], viewElementBeingDragged model ]
+                    [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ], viewElementBeingDragged model ]
                 )
             ]
         ]
