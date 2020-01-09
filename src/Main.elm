@@ -7,7 +7,9 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import List.Extra exposing (findIndex, splitAt)
+import Process
 import Random
+import Task
 
 
 main : Program (Maybe ()) Model Msg
@@ -35,6 +37,7 @@ type alias Model =
     , stacksOrder : List String
     , dragState : DragState
     , searchTerm : String
+    , currentSearchId : String
     }
 
 
@@ -55,11 +58,14 @@ type Msg
     | StackEnterDuringDrag String
     | ItemEnterDuringDrag String
       --Board
-    | CreateStack Float
+    | CreateStack String
     | OnSearchInput String
       --Commands
     | CreateSingleId
-    | OnSearchDone (List Float)
+    | OnSearchDone String (List String)
+      -- Debounced search
+    | AttemptToSearch String
+    | DebouncedSearch String String
 
 
 init : Maybe () -> ( Model, Cmd Msg )
@@ -76,6 +82,7 @@ init _ =
       , stacksOrder = [ "1", "42", "2", "Empty" ]
       , dragState = NoDrag
       , searchTerm = ""
+      , currentSearchId = ""
       }
     , Cmd.none
     )
@@ -278,11 +285,7 @@ update msg model =
                 _ ->
                     noComand model
 
-        CreateStack id ->
-            let
-                newStackId =
-                    String.fromFloat id
-            in
+        CreateStack newStackId ->
             noComand
                 { model
                     | stacksOrder = List.append model.stacksOrder [ newStackId ]
@@ -290,23 +293,27 @@ update msg model =
                 }
 
         OnSearchInput val ->
-            ( { model
-                | searchTerm = val
-                , stacks = Dict.update "SEARCH" (\_ -> Just (Stack "SEARCH" "New Stack" (createItems 15 25))) model.stacks
-              }
-            , Random.generate OnSearchDone createIds
+            ( { model | searchTerm = val }
+            , Random.generate AttemptToSearch createId
             )
 
         CreateSingleId ->
             ( model, Random.generate CreateStack createId )
 
-        OnSearchDone idsAsFloats ->
-            let
-                ids =
-                    idsAsFloats |> List.map String.fromFloat
+        AttemptToSearch searchId ->
+            ( { model | currentSearchId = searchId }, Process.sleep 500 |> Task.perform (always (DebouncedSearch searchId model.searchTerm)) )
 
+        DebouncedSearch id term ->
+            if id == model.currentSearchId then
+                ( { model | currentSearchId = "" }, Random.generate (OnSearchDone term) createIds )
+
+            else
+                ( model, Cmd.none )
+
+        OnSearchDone postfix ids ->
+            let
                 newItems =
-                    ids |> List.map (\id -> Item id ("NEW ITEM" ++ String.slice 2 3 id))
+                    ids |> List.map (\id -> Item id ("ITEM " ++ postfix ++ String.slice 2 3 id))
 
                 newItemsDict =
                     Dict.fromList (List.map (\i -> ( i.id, i )) newItems)
@@ -325,7 +332,7 @@ createIds =
 
 
 createId =
-    Random.float 0 1
+    Random.float 0 1 |> Random.map String.fromFloat
 
 
 unpackMaybes : List (Maybe item) -> List item
