@@ -1,6 +1,11 @@
 :root {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   user-select: none;
+  --item-width: 180px;
+  --item-padding: 0.5em;
+  --double-item-padding: 1em;
+  --page-width: calc(100vw - var(--item-width) - var(--double-item-padding));
+  --sidebar-width: calc(var(--item-width) + var(--double-item-padding));
 }
 
 body {
@@ -15,26 +20,27 @@ body {
   float: left;
   background-color: aquamarine;
   overflow: auto;
-  width: 200px;
+  width: var(--sidebar-width);
   height: 100vh;
+  padding: var(--item-padding);
 }
 
 .page-content{
   float: left;
   background-color: lightblue;
-  width: calc(100vw - 200px);
+  width: var(--page-width);
   overflow: auto;
   height: 100vh;
 }
 
 .item {
   height: 50px;
-  width: 120px;
+  width: var(--item-width);
   background-color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 1em;
+  margin-top: var(--item-padding);
   border: 1px solid grey;
   cursor: pointer;
 }
@@ -55,9 +61,9 @@ body {
 }
 
 .empty-stack-placeholder {
-  margin-top: 1em;
+  margin-top: var(--item-padding);
   height: 20px;
-  width: 120px;
+  width: var(--item-width);
   /* background-color: rgb(234, 253, 205); */
 }
 
@@ -82,12 +88,12 @@ body {
   overflow: auto;
 }
 .column-board {
-  margin-left: 1em;
-  margin-top: 1em;
+  margin-left: var(--item-padding);
+  margin-top: var(--item-padding);
 }
 
 .column-title {
-  padding: 1em;
+  padding: var(--item-padding);
   height: 2em;
   user-select: none;
   cursor: pointer;
@@ -95,7 +101,7 @@ body {
 }
 
 .column-content {
-  padding: 0 1em 1em 1em;
+  padding: 0 var(--item-padding) var(--item-padding) var(--item-padding);
 }
 
 .column-preview {
