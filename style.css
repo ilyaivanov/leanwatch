@@ -16,7 +16,7 @@ body {
   box-sizing: border-box;
 }
 
-.sidebar{
+.sidebar {
   float: left;
   background-color: aquamarine;
   overflow: auto;
@@ -25,7 +25,7 @@ body {
   padding: var(--item-padding);
 }
 
-.page-content{
+.page-content {
   float: left;
   background-color: lightblue;
   width: var(--page-width);
@@ -38,11 +38,30 @@ body {
   width: var(--item-width);
   background-color: white;
   display: flex;
-  align-items: center;
-  justify-content: center;
   margin-top: var(--item-padding);
-  border: 1px solid grey;
   cursor: pointer;
+  position: relative;
+}
+
+.item-image {
+  height: 100%;
+}
+
+/* We need this to handle properly offseX and offsetY */
+.item-click-overlay{
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+.item-preview .item-image{
+  visibility: hidden;
+}
+
+.item-text {
+  flex: 1;
 }
 
 .item-dragged {
@@ -118,6 +137,6 @@ body {
   /* background-color: rgb(234, 253, 205); */
 }
 
-.add-stack-button{
+.add-stack-button {
   align-self: flex-start;
 }

@@ -1,6 +1,7 @@
 module Main exposing (main)
 
 import Browser
+import Debug exposing (log)
 import Dict exposing (Dict)
 import ExtraEvents exposing (..)
 import Html exposing (..)
@@ -170,6 +171,10 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ItemMouseDown itemId { mousePosition, offsets } ->
+            let
+                x =
+                    log "ItemMouseDown " { mousePosition = mousePosition, offsets = offsets }
+            in
             noComand { model | dragState = DraggingItem mousePosition offsets itemId }
 
         MouseUp ->
@@ -407,11 +412,11 @@ notEquals a b =
 
 view : Model -> Html Msg
 view model =
-    div (attributeIf (isDraggingAnything model.dragState) (onMouseMove MouseMove))
+    div (attributesIf (isDraggingAnything model.dragState) [onMouseMove MouseMove, onMouseUp MouseUp])
         [ viewSidebar model
         , div [ class "page-content" ]
             [ div
-                [ class "board", classIf (isDraggingAnything model.dragState) "board-during-drag", onMouseUp MouseUp ]
+                [ class "board", classIf (isDraggingAnything model.dragState) "board-during-drag" ]
                 (List.append
                     (model.stacksOrder
                         |> List.map (\stackId -> Dict.get stackId model.stacks)
@@ -440,7 +445,7 @@ viewStack dragState attributes ( { id, name }, items ) =
                     [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag id) ] [] ]
 
                  else
-                    List.map (\item -> viewItem (isDraggingItem dragState item) item) items
+                    List.map (\item -> viewItem [] (isDraggingItem dragState item) item) items
                 )
             ]
         , div [ class "column-footer", onMouseEnter (StackOverlayEnterDuringDrag id) ] []
@@ -463,30 +468,35 @@ viewSidebar model =
     in
     div [ class "sidebar" ]
         [ input [ onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
-        , div [] (List.map (\item -> viewItem (isDraggingItem model.dragState item) item) items)
+        , div [] (List.map (\item -> viewItem [] (isDraggingItem model.dragState item) item) items)
         ]
 
 
-viewItem : Bool -> Item -> Html Msg
-viewItem isDragging { id, name } =
+viewItem : List (Attribute Msg) -> Bool -> Item -> Html Msg
+viewItem atts isDragging { id, name } =
     div
-        [ class "item"
-        , classIf isDragging "item-preview"
-        , onMouseDown (ItemMouseDown id)
-        , onMouseEnter (ItemEnterDuringDrag id)
+        (List.append
+            [ class "item"
+            , classIf isDragging "item-preview"
+            ]
+            atts
+        )
+        [ img [ draggable "false", class "item-image", src "https://i.ytimg.com/vi/-9pgIVcB3rk/mqdefault.jpg" ] []
+        , span [ class "item-text" ] [ text name ]
+        , div [ class "item-click-overlay", onMouseDown (ItemMouseDown id), onMouseEnter (ItemEnterDuringDrag id) ] []
         ]
-        [ text name ]
 
 
 viewElementBeingDragged model =
     case model.dragState of
         DraggingItem mouseMoveEvent offsets itemId ->
-            div
-                [ class "item item-dragged"
+            viewItem
+                [ class "item-dragged"
                 , style "left" (String.fromInt (mouseMoveEvent.pageX - offsets.offsetX) ++ "px")
                 , style "top" (String.fromInt (mouseMoveEvent.pageY - offsets.offsetY) ++ "px")
                 ]
-                [ text (model.items |> Dict.get itemId |> Maybe.withDefault (Item "1" "1")).name ]
+                False
+                (model.items |> Dict.get itemId |> Maybe.withDefault (Item "1" "1"))
 
         DraggingStack mouseMoveEvent offsets stackId ->
             let
@@ -517,10 +527,10 @@ classIf condition className =
         class ""
 
 
-attributeIf : Bool -> Attribute msg -> List (Attribute msg)
-attributeIf condition attribute =
+attributesIf : Bool -> List (Attribute msg) -> List (Attribute msg)
+attributesIf condition attributes =
     if condition then
-        [ attribute ]
+        attributes
 
     else
         []
