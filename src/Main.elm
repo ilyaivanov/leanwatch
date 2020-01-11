@@ -80,12 +80,12 @@ init _ =
     ( { stacks =
             Dict.fromList
                 [ ( "1", Stack "1" "My Stack 1" (createItems 1 5) )
-                , ( "2", Stack "2" "My Stack 42" (createItems 6 10) )
-                , ( "42", Stack "42" "My Stack 2" (createItems 11 15) )
+                , ( "2", Stack "2" "My Stack 42" (createItems 6 30) )
+                , ( "42", Stack "42" "My Stack 2" (createItems 31 35) )
                 , ( "Empty", Stack "Empty" "My Stack Empty" [] )
-                , ( "SEARCH", Stack "SEARCH" "SEARCH_STACK" (createItems 16 20) )
+                , ( "SEARCH", Stack "SEARCH" "SEARCH_STACK" (createItems 36 37) )
                 ]
-      , items = Dict.fromList (List.range 1 20 |> List.map String.fromInt |> List.map (\id -> ( id, { id = id, youtubeId = "WddpRmmAYkg", name = "Item NEW LOng long long very long text indeeo" ++ id } )))
+      , items = Dict.fromList (List.range 1 40 |> List.map String.fromInt |> List.map (\id -> ( id, { id = id, youtubeId = "WddpRmmAYkg", name = "Item NEW LOng long long very long text indeeo" ++ id } )))
       , stacksOrder = [ "1", "42", "2", "Empty" ]
       , dragState = NoDrag
       , searchTerm = ""
@@ -450,20 +450,24 @@ notEquals a b =
 view : Model -> Html Msg
 view model =
     div (attributesIf (shouldListenToMoveEvents model.dragState) [ onMouseMove MouseMove, onMouseUp MouseUp ])
-        [ viewSidebar model
-        , div [ class "page-content" ]
-            [ div
-                [ class "board", classIf (isDraggingAnything model.dragState) "board-during-drag" ]
-                (List.append
-                    (model.stacksOrder
-                        |> List.map (\stackId -> Dict.get stackId model.stacks)
-                        |> unpackMaybes
-                        |> List.map (\stack -> viewStack model.dragState [ class "column-board" ] (getStackToView model stack.id))
+        [ div [ class "top-bar" ] [ text "Top bar" ]
+        , div []
+            [ viewSidebar model
+            , div [ class "page-content" ]
+                [ div [ class "board-header" ] [ text "Board Bar" ]
+                , div
+                    [ class "board", classIf (isDraggingAnything model.dragState) "board-during-drag" ]
+                    (List.append
+                        (model.stacksOrder
+                            |> List.map (\stackId -> Dict.get stackId model.stacks)
+                            |> unpackMaybes
+                            |> List.map (\stack -> viewStack model.dragState [ class "column-board" ] (getStackToView model stack.id))
+                        )
+                        [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ], viewElementBeingDragged model ]
                     )
-                    [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ], viewElementBeingDragged model ]
-                )
+                ]
+            , viewPlayer model
             ]
-        , viewPlayer model
         ]
 
 
@@ -519,7 +523,7 @@ viewItem atts isDragging { id, name, youtubeId } =
             ]
             atts
         )
-        [ img [ draggable "false", class "item-image", src "https://i.ytimg.com/vi/-9pgIVcB3rk/mqdefault.jpg" ]
+        [ img [ draggable "false", class "item-image", src ("https://i.ytimg.com/vi/" ++ youtubeId ++ "/mqdefault.jpg") ]
             []
         , span [ class "item-text" ] [ text name ]
         , div [ class "item-click-overlay", onMouseDown (ItemMouseDown id), onMouseEnter (ItemEnterDuringDrag id) ] []

@@ -4,8 +4,13 @@
   --item-width: 180px;
   --item-padding: 0.5em;
   --double-item-padding: 1em;
-  --page-width: calc(100vw - var(--item-width) - var(--double-item-padding));
+  --board-header-height:  40px;
+  --top-bar-height: 40px;
+
   --sidebar-width: calc(var(--item-width) + var(--double-item-padding));
+  --page-width: calc(100vw - var(--item-width) - var(--double-item-padding));
+  --page-height:  calc(100vh - var(--top-bar-height));
+  --column-height:  calc(100vh - var(--top-bar-height) - var(--item-padding) - var(--item-padding) - var(--board-header-height));
 }
 
 body {
@@ -21,7 +26,7 @@ body {
   background-color: aquamarine;
   overflow: auto;
   width: var(--sidebar-width);
-  height: 100vh;
+  height: var(--page-height);
   padding: var(--item-padding);
 }
 
@@ -30,7 +35,7 @@ body {
   background-color: lightblue;
   width: var(--page-width);
   overflow: auto;
-  height: 100vh;
+  height: var(--page-height);
 }
 
 .item {
@@ -98,7 +103,11 @@ body {
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  height: 100vh;
+}
+
+.board-header{
+  height: var(--board-header-height);
+  padding: var(--item-padding);
 }
 
 .board-during-drag {
@@ -111,7 +120,7 @@ body {
 
 .column {
   background-color: cadetblue;
-  max-height: 100vh;
+  max-height: var(--column-height);
   overflow: auto;
 }
 .column-board {
@@ -153,4 +162,10 @@ body {
   position: fixed;
   right: 15px;
   bottom: 15px;
+}
+
+/* TOP BAR */
+.top-bar {
+  height: var(--top-bar-height);
+  padding: 4px;
 }
