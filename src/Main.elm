@@ -101,7 +101,7 @@ init _ =
       , searchTerm = ""
       , currentSearchId = ""
       , videoBeingPlayed = Nothing
-      , sidebarState = Search
+      , sidebarState = Boards
       }
     , Cmd.none
     )
@@ -235,6 +235,7 @@ isSearch state =
 
         _ ->
             False
+
 
 isHidden : SidebarState -> Bool
 isHidden state =
@@ -596,8 +597,16 @@ viewSearch model =
 
 
 viewBoards model =
-    [ div [ class "sidebar-header" ] [ h3 [] [ text "Boards" ], button [ onClick HideSidebar ] [ text "<" ] ]
+    [ div [ class "sidebar-header" ]
+        [ h3 [] [ text "Boards" ]
+        , button [ onClick HideSidebar ] [ text "<" ]
+        ]
+    , div [] ([ "Board 1", "Board 2", "Board 3" ] |> List.map viewBoardButton)
     ]
+
+
+viewBoardButton name =
+    div [ class "sidebar-boards-button", classIf (name == "Board 1") "active" ] [ text name ]
 
 
 viewItem : List (Attribute Msg) -> Bool -> Item -> Html Msg

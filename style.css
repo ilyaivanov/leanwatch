@@ -49,7 +49,6 @@ h3 {
   overflow: auto;
   width: var(--sidebar-width);
   height: var(--board-height);
-  padding: var(--item-padding);
 }
 
 .sidebar-header {
@@ -58,6 +57,21 @@ h3 {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
+}
+
+.sidebar-boards-button {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: var(--item-padding);
+  padding-left: calc(var(--item-padding) + 4px);
+  border-bottom: 1px lightgrey solid;
+}
+
+.sidebar-boards-button.active {
+  background-color: rgba(0, 0, 0, 0.2);
+  padding-left: calc(var(--item-padding));
+  border-left: 4px white solid;
 }
 
 /* BOARD and STACKS */
