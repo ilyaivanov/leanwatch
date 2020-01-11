@@ -450,24 +450,39 @@ notEquals a b =
 view : Model -> Html Msg
 view model =
     div (attributesIf (shouldListenToMoveEvents model.dragState) [ onMouseMove MouseMove, onMouseUp MouseUp ])
-        [ div [ class "top-bar" ] [ text "Top bar" ]
+        [ viewTopBar model
         , div []
             [ viewSidebar model
-            , div [ class "page-content" ]
-                [ div [ class "board-header" ] [ text "Board Bar" ]
-                , div
-                    [ class "board", classIf (isDraggingAnything model.dragState) "board-during-drag" ]
-                    (List.append
-                        (model.stacksOrder
-                            |> List.map (\stackId -> Dict.get stackId model.stacks)
-                            |> unpackMaybes
-                            |> List.map (\stack -> viewStack model.dragState [ class "column-board" ] (getStackToView model stack.id))
-                        )
-                        [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ], viewElementBeingDragged model ]
-                    )
-                ]
-            , viewPlayer model
+            , viewBoard model
             ]
+        , viewPlayer model
+        ]
+
+
+viewTopBar : Model -> Html Msg
+viewTopBar model =
+    div [ class "top-bar" ] [ text "Top bar" ]
+
+
+viewBoardBar : Model -> Html Msg
+viewBoardBar model =
+    div [ class "board-header" ] [ text "Board Bar" ]
+
+
+viewBoard : Model -> Html Msg
+viewBoard model =
+    div [ class "board", classIf (isDraggingAnything model.dragState) "board-during-drag" ]
+        [ viewBoardBar model
+        , div
+            [ class "columns-container" ]
+            (List.append
+                (model.stacksOrder
+                    |> List.map (\stackId -> Dict.get stackId model.stacks)
+                    |> unpackMaybes
+                    |> List.map (\stack -> viewStack model.dragState [ class "column-board" ] (getStackToView model stack.id))
+                )
+                [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ], viewElementBeingDragged model ]
+            )
         ]
 
 

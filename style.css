@@ -4,13 +4,16 @@
   --item-width: 180px;
   --item-padding: 0.5em;
   --double-item-padding: 1em;
-  --board-header-height:  40px;
+  --board-header-height: 40px;
   --top-bar-height: 40px;
 
   --sidebar-width: calc(var(--item-width) + var(--double-item-padding));
   --page-width: calc(100vw - var(--item-width) - var(--double-item-padding));
-  --page-height:  calc(100vh - var(--top-bar-height));
-  --column-height:  calc(100vh - var(--top-bar-height) - var(--item-padding) - var(--item-padding) - var(--board-header-height));
+  --page-height: calc(100vh - var(--top-bar-height));
+  --column-height: calc(
+    100vh - var(--top-bar-height) - var(--item-padding) - var(--item-padding) -
+      var(--board-header-height)
+  );
 }
 
 body {
@@ -21,6 +24,18 @@ body {
   box-sizing: border-box;
 }
 
+.add-stack-button {
+  align-self: flex-start;
+}
+
+.player-container {
+  position: fixed;
+  right: 15px;
+  bottom: 15px;
+}
+
+/* SIDEBAR */
+
 .sidebar {
   float: left;
   background-color: aquamarine;
@@ -30,13 +45,79 @@ body {
   padding: var(--item-padding);
 }
 
-.page-content {
+/* BOARD and STACKS */
+
+.board {
   float: left;
   background-color: lightblue;
   width: var(--page-width);
   overflow: auto;
   height: var(--page-height);
 }
+
+.empty-stack-placeholder {
+  margin-top: var(--item-padding);
+  height: 20px;
+  width: var(--item-width);
+  /* background-color: rgb(234, 253, 205); */
+}
+
+.columns-container {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.board-header {
+  height: var(--board-header-height);
+  padding: var(--item-padding);
+}
+
+.board-during-drag {
+  cursor: grabbing;
+}
+
+.board-during-drag .item {
+  cursor: inherit;
+}
+
+.column {
+  background-color: cadetblue;
+  max-height: var(--column-height);
+  overflow: auto;
+}
+.column-board {
+  margin-left: var(--item-padding);
+  margin-top: var(--item-padding);
+}
+
+.column-title {
+  padding: var(--item-padding);
+  height: 2em;
+  user-select: none;
+  cursor: pointer;
+  /* background-color: rgb(234, 253, 205); */
+}
+
+.column-content {
+  padding: 0 var(--item-padding) var(--item-padding) var(--item-padding);
+}
+
+.column-preview {
+  opacity: 0.4;
+}
+
+.column-drag-overlay {
+  display: flex;
+  flex-direction: column;
+}
+
+.column-footer {
+  flex: 1;
+  /* background-color: rgb(234, 253, 205); */
+}
+
+/* CARDS */
 
 .item {
   height: 50px;
@@ -90,78 +171,6 @@ body {
   border: none;
   color: rgba(0, 0, 0, 0);
   background-color: rgba(0, 0, 0, 0.2);
-}
-
-.empty-stack-placeholder {
-  margin-top: var(--item-padding);
-  height: 20px;
-  width: var(--item-width);
-  /* background-color: rgb(234, 253, 205); */
-}
-
-.board {
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-}
-
-.board-header{
-  height: var(--board-header-height);
-  padding: var(--item-padding);
-}
-
-.board-during-drag {
-  cursor: grabbing;
-}
-
-.board-during-drag .item {
-  cursor: inherit;
-}
-
-.column {
-  background-color: cadetblue;
-  max-height: var(--column-height);
-  overflow: auto;
-}
-.column-board {
-  margin-left: var(--item-padding);
-  margin-top: var(--item-padding);
-}
-
-.column-title {
-  padding: var(--item-padding);
-  height: 2em;
-  user-select: none;
-  cursor: pointer;
-  /* background-color: rgb(234, 253, 205); */
-}
-
-.column-content {
-  padding: 0 var(--item-padding) var(--item-padding) var(--item-padding);
-}
-
-.column-preview {
-  opacity: 0.4;
-}
-
-.column-drag-overlay {
-  display: flex;
-  flex-direction: column;
-}
-
-.column-footer {
-  flex: 1;
-  /* background-color: rgb(234, 253, 205); */
-}
-
-.add-stack-button {
-  align-self: flex-start;
-}
-
-.player-container {
-  position: fixed;
-  right: 15px;
-  bottom: 15px;
 }
 
 /* TOP BAR */
