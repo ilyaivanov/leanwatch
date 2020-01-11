@@ -44,6 +44,11 @@ type alias Model =
     --Player Sate
     , videoBeingPlayed : Maybe String
     , sidebarState : SidebarState
+
+    -- Boards
+    , boards : Dict String Board
+    , selectedBoard : String
+    , boardsOrder : List String
     }
 
 
@@ -60,9 +65,16 @@ type SidebarState
     | Boards
 
 
+type alias Board =
+    { id : String
+    , name : String
+    , columns : List String
+    }
+
+
 type Msg
     = Noop
-      --DND events
+      -- DND events
     | StackTitleMouseDown String MouseDownEvent
     | ItemMouseDown String MouseDownEvent
     | MouseMove MouseMoveEvent
@@ -70,10 +82,10 @@ type Msg
     | StackOverlayEnterDuringDrag String
     | StackEnterDuringDrag String
     | ItemEnterDuringDrag String
-      --Board
+      -- Board
     | CreateStack String
     | OnSearchInput String
-      --Commands
+      -- Commands
     | CreateSingleId
     | OnSearchDone String (List String)
       -- Debounced search
@@ -83,6 +95,8 @@ type Msg
     | HideSidebar
     | ShowSearch
     | ShowBoards
+      -- Board Management
+    | SelectBoard String
 
 
 init : Maybe () -> ( Model, Cmd Msg )
@@ -102,6 +116,14 @@ init _ =
       , currentSearchId = ""
       , videoBeingPlayed = Nothing
       , sidebarState = Boards
+      , boards =
+            Dict.fromList
+                [ ( "BOARD1", { id = "BOARD1", name = "My Board", columns = [] } )
+                , ( "BOARD2", { id = "BOARD2", name = "My Second Board", columns = [] } )
+                , ( "BOARD3", { id = "BOARD3", name = "My Third Board", columns = [] } )
+                ]
+      , selectedBoard = "BOARD1"
+      , boardsOrder = [ "BOARD3", "BOARD2", "BOARD1" ]
       }
     , Cmd.none
     )
@@ -245,6 +267,13 @@ isHidden state =
 
         _ ->
             False
+
+
+getBoardsInOrder : Model -> List Board
+getBoardsInOrder model =
+    model.boardsOrder
+        |> List.map (\boardId -> Dict.get boardId model.boards)
+        |> unpackMaybes
 
 
 
@@ -425,6 +454,9 @@ update msg model =
         HideSidebar ->
             noComand { model | sidebarState = Hidden }
 
+        SelectBoard boardId ->
+            noComand { model | selectedBoard = boardId }
+
         Noop ->
             noComand model
 
@@ -601,12 +633,12 @@ viewBoards model =
         [ h3 [] [ text "Boards" ]
         , button [ onClick HideSidebar ] [ text "<" ]
         ]
-    , div [] ([ "Board 1", "Board 2", "Board 3" ] |> List.map viewBoardButton)
+    , div [] (getBoardsInOrder model |> List.map (viewBoardButton model))
     ]
 
 
-viewBoardButton name =
-    div [ class "sidebar-boards-button", classIf (name == "Board 1") "active" ] [ text name ]
+viewBoardButton model { name, id } =
+    div [ class "sidebar-boards-button", classIf (model.selectedBoard == id) "active", onClick (SelectBoard id) ] [ text name ]
 
 
 viewItem : List (Attribute Msg) -> Bool -> Item -> Html Msg
