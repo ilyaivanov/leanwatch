@@ -68,7 +68,7 @@ type SidebarState
 type alias Board =
     { id : String
     , name : String
-    , columns : List String
+    , stacks : List String
     }
 
 
@@ -118,9 +118,9 @@ init _ =
       , sidebarState = Boards
       , boards =
             Dict.fromList
-                [ ( "BOARD1", { id = "BOARD1", name = "My Board", columns = [] } )
-                , ( "BOARD2", { id = "BOARD2", name = "My Second Board", columns = [] } )
-                , ( "BOARD3", { id = "BOARD3", name = "My Third Board", columns = [] } )
+                [ ( "BOARD1", { id = "BOARD1", name = "My Board", stacks = [ "1", "2" ] } )
+                , ( "BOARD2", { id = "BOARD2", name = "My Second Board", stacks = [ "42", "Empty" ] } )
+                , ( "BOARD3", { id = "BOARD3", name = "My Third Board", stacks = [] } )
                 ]
       , selectedBoard = "BOARD1"
       , boardsOrder = [ "BOARD3", "BOARD2", "BOARD1" ]
@@ -274,6 +274,11 @@ getBoardsInOrder model =
     model.boardsOrder
         |> List.map (\boardId -> Dict.get boardId model.boards)
         |> unpackMaybes
+
+
+getBoardViewModel : Model -> Board
+getBoardViewModel model =
+    Dict.get model.selectedBoard model.boards |> Maybe.withDefault { id = "", name = "NNOT_FOUND", stacks = [] }
 
 
 
@@ -531,7 +536,7 @@ view model =
         [ viewTopBar model
         , div []
             [ viewSidebar model
-            , viewBoard model
+            , viewBoard (getBoardViewModel model) model
             ]
         , viewPlayer model
         ]
@@ -545,23 +550,18 @@ viewTopBar model =
         ]
 
 
-viewBoardBar : Model -> Html Msg
-viewBoardBar model =
-    div [ class "board-header" ] [ text "Board Bar" ]
-
-
-viewBoard : Model -> Html Msg
-viewBoard model =
+viewBoard : Board -> Model -> Html Msg
+viewBoard board model =
     div
         [ class "board"
         , classIf (not (isHidden model.sidebarState)) "board-with-sidebar"
         , classIf (isDraggingAnything model.dragState) "board-during-drag"
         ]
-        [ viewBoardBar model
+        [ viewBoardBar board
         , div
             [ class "columns-container" ]
             (List.append
-                (model.stacksOrder
+                (board.stacks
                     |> List.map (\stackId -> Dict.get stackId model.stacks)
                     |> unpackMaybes
                     |> List.map (\stack -> viewStack model.dragState [ class "column-board" ] (getStackToView model stack.id))
@@ -569,6 +569,11 @@ viewBoard model =
                 [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ], viewElementBeingDragged model ]
             )
         ]
+
+
+viewBoardBar : Board -> Html Msg
+viewBoardBar { name } =
+    div [ class "board-header" ] [ text name ]
 
 
 viewStack : DragState -> List (Attribute Msg) -> ( Stack, List Item ) -> Html Msg

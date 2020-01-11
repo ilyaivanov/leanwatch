@@ -66,6 +66,7 @@ h3 {
   padding: var(--item-padding);
   padding-left: calc(var(--item-padding) + 4px);
   border-bottom: 1px lightgrey solid;
+  cursor: pointer;
 }
 
 .sidebar-boards-button.active {
