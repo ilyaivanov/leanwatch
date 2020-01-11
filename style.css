@@ -8,8 +8,11 @@
   --top-bar-height: 40px;
 
   --sidebar-width: calc(var(--item-width) + var(--double-item-padding));
-  --page-width: calc(100vw - var(--item-width) - var(--double-item-padding));
-  --page-height: calc(100vh - var(--top-bar-height));
+  --board-width: 100vw;
+  --board-width-with-sidebar: calc(
+    100vw - var(--item-width) - var(--double-item-padding)
+  );
+  --board-height: calc(100vh - var(--top-bar-height));
   --column-height: calc(
     100vh - var(--top-bar-height) - var(--item-padding) - var(--item-padding) -
       var(--board-header-height)
@@ -18,6 +21,10 @@
 
 body {
   margin: 0;
+}
+
+h3 {
+  margin: 0 0 0 0;
 }
 
 * {
@@ -41,8 +48,16 @@ body {
   background-color: aquamarine;
   overflow: auto;
   width: var(--sidebar-width);
-  height: var(--page-height);
+  height: var(--board-height);
   padding: var(--item-padding);
+}
+
+.sidebar-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
 }
 
 /* BOARD and STACKS */
@@ -50,9 +65,13 @@ body {
 .board {
   float: left;
   background-color: lightblue;
-  width: var(--page-width);
+  width: var(--board-width);
   overflow: auto;
-  height: var(--page-height);
+  height: var(--board-height);
+}
+
+.board-with-sidebar {
+  --board-width: var(--board-width-with-sidebar);
 }
 
 .empty-stack-placeholder {
@@ -177,4 +196,8 @@ body {
 .top-bar {
   height: var(--top-bar-height);
   padding: 4px;
+}
+
+button.active {
+  background-color: lightblue;
 }

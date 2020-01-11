@@ -1,7 +1,6 @@
 module Main exposing (main)
 
 import Browser
-import Debug exposing (log)
 import Dict exposing (Dict)
 import Embed.Youtube
 import Embed.Youtube.Attributes
@@ -44,6 +43,7 @@ type alias Model =
 
     --Player Sate
     , videoBeingPlayed : Maybe String
+    , sidebarState : SidebarState
     }
 
 
@@ -52,6 +52,12 @@ type DragState
     | ItemPressedNotYetMoved MouseMoveEvent Offsets String
     | DraggingItem MouseMoveEvent Offsets String
     | DraggingStack MouseMoveEvent Offsets String
+
+
+type SidebarState
+    = Hidden
+    | Search
+    | Boards
 
 
 type Msg
@@ -73,6 +79,10 @@ type Msg
       -- Debounced search
     | AttemptToSearch String
     | DebouncedSearch String String
+      -- Sidebar
+    | HideSidebar
+    | ShowSearch
+    | ShowBoards
 
 
 init : Maybe () -> ( Model, Cmd Msg )
@@ -91,6 +101,7 @@ init _ =
       , searchTerm = ""
       , currentSearchId = ""
       , videoBeingPlayed = Nothing
+      , sidebarState = Search
       }
     , Cmd.none
     )
@@ -206,6 +217,35 @@ getStack stackId stacks =
     Dict.get stackId stacks |> Maybe.withDefault (Stack "NOT_FOUND" "NOT_FOUND" [])
 
 
+isBoards : SidebarState -> Bool
+isBoards state =
+    case state of
+        Boards ->
+            True
+
+        _ ->
+            False
+
+
+isSearch : SidebarState -> Bool
+isSearch state =
+    case state of
+        Search ->
+            True
+
+        _ ->
+            False
+
+isHidden : SidebarState -> Bool
+isHidden state =
+    case state of
+        Hidden ->
+            True
+
+        _ ->
+            False
+
+
 
 -- UPDATE
 
@@ -214,10 +254,6 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ItemMouseDown itemId { mousePosition, offsets } ->
-            let
-                x =
-                    log "ItemMouseDown " { mousePosition = mousePosition, offsets = offsets }
-            in
             noComand { model | dragState = ItemPressedNotYetMoved mousePosition offsets itemId }
 
         MouseUp ->
@@ -379,6 +415,15 @@ update msg model =
             in
             noComand { model | stacks = Dict.update "SEARCH" (\_ -> Just (Stack "SEARCH" "New Stack" ids)) model.stacks, items = itemsUpdated }
 
+        ShowBoards ->
+            noComand { model | sidebarState = Boards }
+
+        ShowSearch ->
+            noComand { model | sidebarState = Search }
+
+        HideSidebar ->
+            noComand { model | sidebarState = Hidden }
+
         Noop ->
             noComand model
 
@@ -461,7 +506,10 @@ view model =
 
 viewTopBar : Model -> Html Msg
 viewTopBar model =
-    div [ class "top-bar" ] [ text "Top bar" ]
+    div [ class "top-bar" ]
+        [ button [ classIf (isBoards model.sidebarState) "active", onClick ShowBoards ] [ text "boards" ]
+        , button [ classIf (isSearch model.sidebarState) "active", onClick ShowSearch ] [ text "search" ]
+        ]
 
 
 viewBoardBar : Model -> Html Msg
@@ -471,7 +519,11 @@ viewBoardBar model =
 
 viewBoard : Model -> Html Msg
 viewBoard model =
-    div [ class "board", classIf (isDraggingAnything model.dragState) "board-during-drag" ]
+    div
+        [ class "board"
+        , classIf (not (isHidden model.sidebarState)) "board-with-sidebar"
+        , classIf (isDraggingAnything model.dragState) "board-during-drag"
+        ]
         [ viewBoardBar model
         , div
             [ class "columns-container" ]
@@ -511,6 +563,20 @@ viewStack dragState attributes ( { id, name }, items ) =
 
 viewSidebar : Model -> Html Msg
 viewSidebar model =
+    case model.sidebarState of
+        Search ->
+            div [ class "sidebar" ]
+                (viewSearch model)
+
+        Boards ->
+            div [ class "sidebar" ]
+                (viewBoards model)
+
+        Hidden ->
+            div [] []
+
+
+viewSearch model =
     let
         stackM =
             getSearchStack model
@@ -523,10 +589,15 @@ viewSidebar model =
                 Nothing ->
                     []
     in
-    div [ class "sidebar" ]
-        [ input [ onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
-        , div [] (List.map (\item -> viewItem [] (isDraggingItem model.dragState item) item) items)
-        ]
+    [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick HideSidebar ] [ text "<" ] ]
+    , input [ onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
+    , div [] (List.map (\item -> viewItem [] (isDraggingItem model.dragState item) item) items)
+    ]
+
+
+viewBoards model =
+    [ div [ class "sidebar-header" ] [ h3 [] [ text "Boards" ], button [ onClick HideSidebar ] [ text "<" ] ]
+    ]
 
 
 viewItem : List (Attribute Msg) -> Bool -> Item -> Html Msg
