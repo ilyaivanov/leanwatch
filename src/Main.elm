@@ -36,7 +36,6 @@ noComand model =
 type alias Model =
     { stacks : Dict String Stack
     , items : Dict String Item
-    , stacksOrder : List String
     , dragState : DragState
     , searchTerm : String
     , currentSearchId : String
@@ -110,7 +109,6 @@ init _ =
                 , ( "SEARCH", Stack "SEARCH" "SEARCH_STACK" (createItems 36 37) )
                 ]
       , items = Dict.fromList (List.range 1 40 |> List.map String.fromInt |> List.map (\id -> ( id, { id = id, youtubeId = "WddpRmmAYkg", name = "Item NEW LOng long long very long text indeeo" ++ id } )))
-      , stacksOrder = [ "1", "42", "2", "Empty" ]
       , dragState = NoDrag
       , searchTerm = ""
       , currentSearchId = ""
@@ -359,7 +357,7 @@ update msg model =
         StackEnterDuringDrag stackUnder ->
             case model.dragState of
                 DraggingStack _ _ stackOver ->
-                    noComand { model | stacksOrder = moveStackToAnotherPosition model stackOver stackUnder }
+                    noComand { model | boards = moveStackToAnotherPosition model stackOver stackUnder }
 
                 _ ->
                     noComand model
@@ -367,7 +365,7 @@ update msg model =
         StackOverlayEnterDuringDrag stackUnder ->
             case model.dragState of
                 DraggingStack _ _ stackOver ->
-                    noComand { model | stacksOrder = moveStackToAnotherPosition model stackOver stackUnder }
+                    noComand { model | boards = moveStackToAnotherPosition model stackOver stackUnder }
 
                 DraggingItem _ _ itemOver ->
                     let
@@ -415,7 +413,7 @@ update msg model =
         CreateStack newStackId ->
             noComand
                 { model
-                    | stacksOrder = List.append model.stacksOrder [ newStackId ]
+                    | boards = updateBoard model.selectedBoard (\b -> { b | stacks = List.append b.stacks [ newStackId ] }) model.boards
                     , stacks = Dict.insert newStackId (Stack newStackId "New Stack" []) model.stacks
                 }
 
@@ -479,19 +477,28 @@ unpackMaybes maybes =
     List.filterMap identity maybes
 
 
+moveStackToAnotherPosition : Model -> String -> String -> Dict String Board
 moveStackToAnotherPosition model stackOver stackUnder =
     let
+        board =
+            Dict.get model.selectedBoard model.boards |> Maybe.withDefault { id = "", name = "", stacks = [] }
+
         targetIndex =
-            findIndex (equals stackUnder) model.stacksOrder |> Maybe.withDefault -1
+            findIndex (equals stackUnder) board.stacks |> Maybe.withDefault -1
     in
-    model.stacksOrder
-        |> removeItem stackOver
-        |> insertInto targetIndex stackOver
+    model.boards
+        |> updateBoard model.selectedBoard (\s -> { s | stacks = removeItem stackOver s.stacks })
+        |> updateBoard model.selectedBoard (\s -> { s | stacks = insertInto targetIndex stackOver s.stacks })
 
 
 updateStack : String -> (Stack -> Stack) -> Dict String Stack -> Dict String Stack
 updateStack stackId updater stacks =
     Dict.update stackId (Maybe.map (\v -> updater v)) stacks
+
+
+updateBoard : String -> (Board -> Board) -> Dict String Board -> Dict String Board
+updateBoard boardId updater boards =
+    Dict.update boardId (Maybe.map (\v -> updater v)) boards
 
 
 insertInto : Int -> item -> List item -> List item
@@ -603,7 +610,7 @@ viewSidebar : Model -> Html Msg
 viewSidebar model =
     case model.sidebarState of
         Search ->
-            div [ class "sidebar" ]
+            div [ class "sidebar sidebar-padded" ]
                 (viewSearch model)
 
         Boards ->
@@ -634,7 +641,7 @@ viewSearch model =
 
 
 viewBoards model =
-    [ div [ class "sidebar-header" ]
+    [ div [ class "sidebar-header sidebar-padded" ]
         [ h3 [] [ text "Boards" ]
         , button [ onClick HideSidebar ] [ text "<" ]
         ]

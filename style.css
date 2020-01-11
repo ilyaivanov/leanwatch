@@ -13,6 +13,10 @@
     100vw - var(--item-width) - var(--double-item-padding)
   );
   --board-height: calc(100vh - var(--top-bar-height));
+
+  --column-container-height: calc(
+    100vh - var(--top-bar-height) - var(--board-header-height)
+  );
   --column-height: calc(
     100vh - var(--top-bar-height) - var(--item-padding) - var(--item-padding) -
       var(--board-header-height)
@@ -49,6 +53,9 @@ h3 {
   overflow: auto;
   width: var(--sidebar-width);
   height: var(--board-height);
+}
+.sidebar-padded {
+  padding: var(--item-padding);
 }
 
 .sidebar-header {
@@ -100,6 +107,7 @@ h3 {
   display: flex;
   flex-direction: row;
   align-items: stretch;
+  height: var(--column-container-height);
 }
 
 .board-header {
