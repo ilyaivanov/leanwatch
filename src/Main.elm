@@ -34,20 +34,20 @@ noComand model =
 
 
 type alias Model =
-    { stacks : Dict String Stack
+    { boards : Dict String Board
+    , stacks : Dict String Stack
     , items : Dict String Item
+    , boardsOrder : List String
+    , selectedBoard : String
+    , videoBeingPlayed : Maybe String
+
+    -- UI STATE
+    , sidebarState : SidebarState
     , dragState : DragState
     , searchTerm : String
+
+    -- Used to debounce search on input
     , currentSearchId : String
-
-    --Player Sate
-    , videoBeingPlayed : Maybe String
-    , sidebarState : SidebarState
-
-    -- Boards
-    , boards : Dict String Board
-    , selectedBoard : String
-    , boardsOrder : List String
     }
 
 
