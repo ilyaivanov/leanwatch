@@ -45,10 +45,12 @@ body {
 
 .item-image {
   height: 100%;
+  width: 60px;
+  object-fit: cover;
 }
 
-/* We need this to handle properly offseX and offsetY */
-.item-click-overlay{
+/* We need this to handle properly offseX and offsetY because of the image in the item */
+.item-click-overlay {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -56,12 +58,18 @@ body {
   right: 0;
 }
 
-.item-preview .item-image{
+.item-preview .item-image {
   visibility: hidden;
 }
 
 .item-text {
   flex: 1;
+  /* https://smad.jmu.edu/shen/webtype/lineheight.html */
+  /* chosen by the simple eye to limit text to two lines */
+  /* I don't want to have a js implementation */
+  height: 39px;
+  align-self: center;
+  overflow: hidden;
 }
 
 .item-dragged {
@@ -139,4 +147,10 @@ body {
 
 .add-stack-button {
   align-self: flex-start;
+}
+
+.player-container {
+  position: fixed;
+  right: 15px;
+  bottom: 15px;
 }

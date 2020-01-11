@@ -3,6 +3,8 @@ module Main exposing (main)
 import Browser
 import Debug exposing (log)
 import Dict exposing (Dict)
+import Embed.Youtube
+import Embed.Youtube.Attributes
 import ExtraEvents exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -39,11 +41,15 @@ type alias Model =
     , dragState : DragState
     , searchTerm : String
     , currentSearchId : String
+
+    --Player Sate
+    , videoBeingPlayed : Maybe String
     }
 
 
 type DragState
     = NoDrag
+    | ItemPressedNotYetMoved MouseMoveEvent Offsets String
     | DraggingItem MouseMoveEvent Offsets String
     | DraggingStack MouseMoveEvent Offsets String
 
@@ -79,11 +85,12 @@ init _ =
                 , ( "Empty", Stack "Empty" "My Stack Empty" [] )
                 , ( "SEARCH", Stack "SEARCH" "SEARCH_STACK" (createItems 16 20) )
                 ]
-      , items = Dict.fromList (List.range 1 20 |> List.map String.fromInt |> List.map (\id -> ( id, { id = id, name = "Item NEW " ++ id } )))
+      , items = Dict.fromList (List.range 1 20 |> List.map String.fromInt |> List.map (\id -> ( id, { id = id, youtubeId = "WddpRmmAYkg", name = "Item NEW LOng long long very long text indeeo" ++ id } )))
       , stacksOrder = [ "1", "42", "2", "Empty" ]
       , dragState = NoDrag
       , searchTerm = ""
       , currentSearchId = ""
+      , videoBeingPlayed = Nothing
       }
     , Cmd.none
     )
@@ -99,6 +106,7 @@ type alias Stack =
 type alias Item =
     { id : String
     , name : String
+    , youtubeId : String
     }
 
 
@@ -143,6 +151,19 @@ isDraggingAnything dragState =
         NoDrag ->
             False
 
+        ItemPressedNotYetMoved _ _ _ ->
+            False
+
+        _ ->
+            True
+
+
+shouldListenToMoveEvents : DragState -> Bool
+shouldListenToMoveEvents dragState =
+    case dragState of
+        NoDrag ->
+            False
+
         _ ->
             True
 
@@ -163,6 +184,28 @@ getStackToView model stackId =
     ( stack, items )
 
 
+getStackByItem : String -> Dict String Stack -> Stack
+getStackByItem item stacks =
+    Dict.toList stacks
+        |> List.filter (\( _, stack ) -> List.member item stack.items)
+        |> List.map Tuple.second
+        |> List.head
+        |> Maybe.withDefault (Stack "NOT_FOUND" "NOT_FOUND" [])
+
+
+getItemById : String -> Model -> Maybe Item
+getItemById itemId model =
+    Dict.toList model.items
+        |> List.map Tuple.second
+        |> List.filter (\i -> i.id == itemId)
+        |> List.head
+
+
+getStack : String -> Dict String Stack -> Stack
+getStack stackId stacks =
+    Dict.get stackId stacks |> Maybe.withDefault (Stack "NOT_FOUND" "NOT_FOUND" [])
+
+
 
 -- UPDATE
 
@@ -175,10 +218,15 @@ update msg model =
                 x =
                     log "ItemMouseDown " { mousePosition = mousePosition, offsets = offsets }
             in
-            noComand { model | dragState = DraggingItem mousePosition offsets itemId }
+            noComand { model | dragState = ItemPressedNotYetMoved mousePosition offsets itemId }
 
         MouseUp ->
-            noComand { model | dragState = NoDrag }
+            case model.dragState of
+                ItemPressedNotYetMoved _ _ id ->
+                    noComand { model | dragState = NoDrag, videoBeingPlayed = Just id }
+
+                _ ->
+                    noComand { model | dragState = NoDrag }
 
         StackTitleMouseDown stackId { mousePosition, offsets } ->
             noComand { model | dragState = DraggingStack mousePosition offsets stackId }
@@ -187,6 +235,9 @@ update msg model =
             case ( model.dragState, newMousePosition.buttons ) of
                 ( DraggingStack _ offsets id, 1 ) ->
                     noComand { model | dragState = DraggingStack newMousePosition offsets id }
+
+                ( ItemPressedNotYetMoved _ offsets id, 1 ) ->
+                    noComand { model | dragState = DraggingItem newMousePosition offsets id }
 
                 ( DraggingItem _ offsets id, 1 ) ->
                     noComand { model | dragState = DraggingItem newMousePosition offsets id }
@@ -318,7 +369,7 @@ update msg model =
         OnSearchDone postfix ids ->
             let
                 newItems =
-                    ids |> List.map (\id -> Item id ("ITEM " ++ postfix ++ String.slice 2 3 id))
+                    ids |> List.map (\id -> Item id ("ITEM " ++ postfix ++ String.slice 2 3 id) "b5SSHK-mIF8")
 
                 newItemsDict =
                     Dict.fromList (List.map (\i -> ( i.id, i )) newItems)
@@ -360,20 +411,6 @@ updateStack stackId updater stacks =
     Dict.update stackId (Maybe.map (\v -> updater v)) stacks
 
 
-getStackByItem : String -> Dict String Stack -> Stack
-getStackByItem item stacks =
-    Dict.toList stacks
-        |> List.filter (\( _, stack ) -> List.member item stack.items)
-        |> List.map Tuple.second
-        |> List.head
-        |> Maybe.withDefault (Stack "NOT_FOUND" "NOT_FOUND" [])
-
-
-getStack : String -> Dict String Stack -> Stack
-getStack stackId stacks =
-    Dict.get stackId stacks |> Maybe.withDefault (Stack "NOT_FOUND" "NOT_FOUND" [])
-
-
 insertInto : Int -> item -> List item -> List item
 insertInto index item ary =
     let
@@ -412,7 +449,7 @@ notEquals a b =
 
 view : Model -> Html Msg
 view model =
-    div (attributesIf (isDraggingAnything model.dragState) [onMouseMove MouseMove, onMouseUp MouseUp])
+    div (attributesIf (shouldListenToMoveEvents model.dragState) [ onMouseMove MouseMove, onMouseUp MouseUp ])
         [ viewSidebar model
         , div [ class "page-content" ]
             [ div
@@ -426,6 +463,7 @@ view model =
                     [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ], viewElementBeingDragged model ]
                 )
             ]
+        , viewPlayer model
         ]
 
 
@@ -473,7 +511,7 @@ viewSidebar model =
 
 
 viewItem : List (Attribute Msg) -> Bool -> Item -> Html Msg
-viewItem atts isDragging { id, name } =
+viewItem atts isDragging { id, name, youtubeId } =
     div
         (List.append
             [ class "item"
@@ -481,7 +519,8 @@ viewItem atts isDragging { id, name } =
             ]
             atts
         )
-        [ img [ draggable "false", class "item-image", src "https://i.ytimg.com/vi/-9pgIVcB3rk/mqdefault.jpg" ] []
+        [ img [ draggable "false", class "item-image", src "https://i.ytimg.com/vi/-9pgIVcB3rk/mqdefault.jpg" ]
+            []
         , span [ class "item-text" ] [ text name ]
         , div [ class "item-click-overlay", onMouseDown (ItemMouseDown id), onMouseEnter (ItemEnterDuringDrag id) ] []
         ]
@@ -496,7 +535,7 @@ viewElementBeingDragged model =
                 , style "top" (String.fromInt (mouseMoveEvent.pageY - offsets.offsetY) ++ "px")
                 ]
                 False
-                (model.items |> Dict.get itemId |> Maybe.withDefault (Item "1" "1"))
+                (model.items |> Dict.get itemId |> Maybe.withDefault (Item "1" "1" "1"))
 
         DraggingStack mouseMoveEvent offsets stackId ->
             let
@@ -511,6 +550,33 @@ viewElementBeingDragged model =
                 ( stack, items )
 
         _ ->
+            div [] []
+
+
+viewPlayer model =
+    case model.videoBeingPlayed of
+        Just videoId ->
+            let
+                item =
+                    getItemById videoId model
+            in
+            case item of
+                Just actualItem ->
+                    div [ class "player-container" ]
+                        [ Embed.Youtube.fromString actualItem.youtubeId
+                            |> Embed.Youtube.attributes
+                                [ Embed.Youtube.Attributes.width 400
+                                , Embed.Youtube.Attributes.height 150
+                                , Embed.Youtube.Attributes.autoplay
+                                , Embed.Youtube.Attributes.modestBranding
+                                ]
+                            |> Embed.Youtube.toHtml
+                        ]
+
+                Nothing ->
+                    div [] []
+
+        Nothing ->
             div [] []
 
 
