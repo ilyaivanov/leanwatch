@@ -2,102 +2,50 @@ module Spa exposing (main)
 
 import Browser exposing (Document)
 import Browser.Navigation as Nav
-import Debug as Debug
-import Html exposing (Html, a, div, footer, h1, li, nav, text, ul)
-import Html.Attributes exposing (classList, href)
-import Html.Lazy exposing (lazy)
+import Html exposing (Html, a, div, h3, h4, img, input, text)
+import Html.Attributes exposing (class, href, placeholder, src, type_)
 import Url exposing (Url)
 import Url.Parser as Parser exposing ((</>), Parser, s)
+
+
+main : Program () Model Msg
+main =
+    Browser.application
+        { init = init
+        , onUrlRequest = ClickedLink
+        , onUrlChange = ChangedUrl
+        , subscriptions = \_ -> Sub.none
+        , update = update
+        , view = view
+        }
+
+
+
+-- MODEL
 
 
 type alias Model =
     { page : Page, key : Nav.Key }
 
 
-type Page
-    = Gallery
-    | Folders
-    | SelectedPhoto String
-    | NotFound
-
-
-view : Model -> Document Msg
-view model =
-    { title = "Photo Groove, SPA Style"
-    , body =
-        [ div []
-            [ lazy viewHeader model.page
-            , content model.page
-            , viewFooter
-            ]
-        ]
-    }
-
-
-viewHeader : Page -> Html Msg
-viewHeader page =
-    let
-        logo =
-            h1 [] [ text "Photo Groove" ]
-
-        links =
-            ul []
-                [ navLink Folders { url = "/", caption = "Folders" }
-                , navLink Gallery { url = "/gallery", caption = "Gallery" }
-                , navLink (partialStringToPage "/photos/MyPhoto") { url = "/photos/MyPhoto", caption = "See my photo" }
-                , navLink (partialStringToPage "/photos/OtherPhotoId") { url = "/photos/OtherPhotoId", caption = "See other photo" }
-                ]
-
-        navLink targetPage { url, caption } =
-            li [ classList [ ( "active", isActive { page = page, link = targetPage } ) ] ]
-                [ a [ href url ] [ text caption ] ]
-    in
-    nav [] [ logo, links ]
-
-
-isActive : { link : Page, page : Page } -> Bool
-isActive { link, page } =
-    case ( link, page ) of
-        ( Gallery, Gallery ) ->
-            True
-
-        ( Folders, Folders ) ->
-            True
-
-        ( SelectedPhoto pid, SelectedPhoto nid ) ->
-            let
-                a =
-                    Debug.log "foo " ( pid, nid )
-            in
-            pid == nid
-
-        ( _, _ ) ->
-            False
-
-
-viewFooter : Html msg
-viewFooter =
-    footer [] [ text "One is never alone with a rubber duck. ‐Douglas Adams" ]
-
-
-content page =
-    case page of
-        Gallery ->
-            text "Gallery Page"
-
-        Folders ->
-            text "Folders PAge"
-
-        SelectedPhoto image ->
-            text ("Image of my " ++ image ++ " best interests")
-
-        NotFound ->
-            text "Not Found 404"
+init : () -> Url -> Nav.Key -> ( Model, Cmd Msg )
+init flags url key =
+    ( { page = urlToPage url, key = key }, Cmd.none )
 
 
 type Msg
     = ClickedLink Browser.UrlRequest
     | ChangedUrl Url
+
+
+type Page
+    = Login
+    | Register
+    | NotFound
+
+
+
+-- UPDATE
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -123,9 +71,10 @@ subscriptions model =
 parser : Parser (Page -> a) a
 parser =
     Parser.oneOf
-        [ Parser.map Folders Parser.top
-        , Parser.map Gallery (s "gallery")
-        , Parser.map SelectedPhoto (s "photos" </> Parser.string)
+        [ Parser.map Login Parser.top
+        , Parser.map Register (s "register")
+
+        --, Parser.map SelectedPhoto (s "photos" </> Parser.string)
         ]
 
 
@@ -135,33 +84,49 @@ urlToPage url =
         |> Maybe.withDefault NotFound
 
 
-partialStringToPage : String -> Page
-partialStringToPage str =
-    let
-        url =
-            Url.fromString ("http://dummyDomain.com" ++ str)
-    in
-    case url of
-        Just actualUrl ->
-            Parser.parse parser actualUrl
-                |> Maybe.withDefault NotFound
 
-        Nothing ->
-            NotFound
+-- VIEW
 
 
-init : () -> Url -> Nav.Key -> ( Model, Cmd Msg )
-init flags url key =
-    ( { page = urlToPage url, key = key }, Cmd.none )
+view : Model -> Document Msg
+view model =
+    { title = "Photo Groove, SPA Style"
+    , body =
+        [ div []
+            [ viewPage model ]
+        ]
+    }
 
 
-main : Program () Model Msg
-main =
-    Browser.application
-        { init = init
-        , onUrlRequest = ClickedLink
-        , onUrlChange = ChangedUrl
-        , subscriptions = \_ -> Sub.none
-        , update = update
-        , view = view
-        }
+viewPage model =
+    case model.page of
+        Login ->
+            viewLogin model
+
+        Register ->
+            viewRegister model
+
+        NotFound ->
+            text "Not Found 404"
+
+
+viewLogin model =
+    div [] [ text "Login", a [ href "/register" ] [ text "Register" ] ]
+
+
+viewRegister model =
+    div [ class "form-container" ]
+        [ div [ class "form" ]
+            [ h3 [] [ text "Sign up to Lean Watch" ]
+            , input [ type_ "email", placeholder "Enter email" ] []
+            , div [ class "button flat" ] [ text "Continue" ]
+            , div [ class "or-label" ] [ text "OR" ]
+            , div [ class "button material" ] [ img [ class "google-icon", src "/icons/google.svg" ] [], text "Continue with Google" ]
+            , div [ class "line" ] []
+            , div [] [ a [ href "/" ] [ text "Already have an account? Log in" ] ]
+            ]
+        ]
+
+
+
+--Login Page

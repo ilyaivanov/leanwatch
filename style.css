@@ -27,10 +27,6 @@ body {
   margin: 0;
 }
 
-h3 {
-  margin: 0 0 0 0;
-}
-
 * {
   box-sizing: border-box;
 }
@@ -54,6 +50,7 @@ h3 {
   width: var(--sidebar-width);
   height: var(--board-height);
 }
+
 .sidebar-padded {
   padding: var(--item-padding);
 }
@@ -128,6 +125,7 @@ h3 {
   max-height: var(--column-height);
   overflow: auto;
 }
+
 .column-board {
   margin-left: var(--item-padding);
   margin-top: var(--item-padding);
@@ -223,4 +221,82 @@ h3 {
 
 button.active {
   background-color: lightblue;
+}
+
+/*LOGIN*/
+
+.form {
+  width: 350px;
+  padding: 25px;
+  background-color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: center;
+}
+
+.form-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: lightblue;
+  font-size: 15px;
+}
+
+.form-container input {
+  height: 40px;
+  margin-bottom: 20px;
+  font-size: 15px;
+  padding: 0 5px;
+}
+
+.button {
+  font-weight: bold;
+  padding: 8px 8px 10px;
+  border-radius: 4px;
+  line-height: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.button.flat {
+  background-color: greenyellow;
+  margin-bottom: 10px;
+}
+
+.button.material {
+  background-color: white;
+  box-shadow: rgba(0, 0, 0, 0.2) 1px 1px 5px 0;
+  transition: all100ms linear;
+  cursor: pointer;
+}
+
+.button.material:hover {
+  background-color: #f3f3f3;
+}
+
+.button.material:active {
+  box-shadow: rgba(0, 0, 0, 0.2) 1px 1px 3px 0;
+  background-color: #e7e7e7;
+}
+
+.or-label {
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #1e1e1e;
+}
+
+.line {
+  border-bottom: 1px solid #bcbcbc;
+  margin-bottom: 20px;
+}
+
+.google-icon {
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
 }
