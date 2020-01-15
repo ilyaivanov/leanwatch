@@ -2,8 +2,8 @@ module Spa exposing (main)
 
 import Browser exposing (Document)
 import Browser.Navigation as Nav
-import Html exposing (Html, a, div, h3, h4, img, input, text)
-import Html.Attributes exposing (class, href, placeholder, src, type_)
+import Html exposing (Html, a, button, div, h3, h4, img, input, text)
+import Html.Attributes exposing (autofocus, class, href, placeholder, src, tabindex, type_)
 import Url exposing (Url)
 import Url.Parser as Parser exposing ((</>), Parser, s)
 
@@ -72,7 +72,7 @@ parser : Parser (Page -> a) a
 parser =
     Parser.oneOf
         [ Parser.map Login Parser.top
-        , Parser.map Register (s "register")
+        , Parser.map Register (s "signup")
 
         --, Parser.map SelectedPhoto (s "photos" </> Parser.string)
         ]
@@ -111,7 +111,18 @@ viewPage model =
 
 
 viewLogin model =
-    div [] [ text "Login", a [ href "/register" ] [ text "Register" ] ]
+    div [ class "form-container" ]
+        [ div [ class "form" ]
+            [ h3 [] [ text "Log in to Lean Watch" ]
+            , input [ type_ "email", tabindex 1, autofocus True, placeholder "Enter email" ] []
+            , input [ type_ "password", tabindex 2, placeholder "Enter password" ] []
+            , button [ class "button flat", tabindex 3 ] [ text "Log In" ]
+            , div [ class "or-label" ] [ text "OR" ]
+            , button [ class "button material", tabindex 4 ] [ img [ class "google-icon", src "/icons/google.svg" ] [], text "Log in with Google" ]
+            , div [ class "line" ] []
+            , div [] [ a [ href "/signup" ] [ text "Sign up for an account" ] ]
+            ]
+        ]
 
 
 viewRegister model =
@@ -119,7 +130,7 @@ viewRegister model =
         [ div [ class "form" ]
             [ h3 [] [ text "Sign up to Lean Watch" ]
             , input [ type_ "email", placeholder "Enter email" ] []
-            , div [ class "button flat" ] [ text "Continue" ]
+            , div [ class "button flat disabled" ] [ text "Continue" ]
             , div [ class "or-label" ] [ text "OR" ]
             , div [ class "button material" ] [ img [ class "google-icon", src "/icons/google.svg" ] [], text "Continue with Google" ]
             , div [ class "line" ] []
