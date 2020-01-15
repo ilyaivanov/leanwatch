@@ -1,8 +1,10 @@
-module ExtraEvents exposing (MouseDownEvent, MouseMoveEvent, Offsets, onMouseDown, onMouseEnter, onMouseMove, onMouseUp)
+module ExtraEvents exposing (MouseDownEvent, MouseMoveEvent, Offsets, classIf, onClickIf, onMouseDown, onMouseEnter, onMouseMove, onMouseUp)
 
 import Html exposing (..)
+import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Json.Decode as Decode
+
 
 type alias MouseMoveEvent =
     { pageX : Int
@@ -61,3 +63,25 @@ offsetsDecoder =
     Decode.map2 Offsets
         (Decode.field "offsetX" Decode.int)
         (Decode.field "offsetY" Decode.int)
+
+
+onClickIf : Bool -> msg -> Attribute msg
+onClickIf condition msg =
+    if condition then
+        onClick msg
+
+    else
+        emptyAttribute
+
+
+classIf : Bool -> String -> Attribute msg
+classIf condition className =
+    if condition then
+        class className
+
+    else
+        emptyAttribute
+
+
+emptyAttribute =
+    class ""

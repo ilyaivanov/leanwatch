@@ -5,11 +5,12 @@ import Browser.Navigation as Nav
 import Html exposing (Attribute, Html, a, button, div, h3, img, input, span, text)
 import Html.Attributes exposing (autofocus, class, classList, disabled, href, placeholder, src, tabindex, type_, value)
 import Html.Events exposing (onClick, onInput)
+import Login as Login
 import Url exposing (Url)
 import Url.Parser as Parser exposing ((</>), Parser, s)
 
 
-port login : Creds -> Cmd msg
+port login : Login.Creds -> Cmd msg
 
 
 port onLoginSuccess : (LoginResponse -> msg) -> Sub msg
@@ -42,14 +43,8 @@ type alias LoginResponse =
 type alias Model =
     { page : Page
     , key : Nav.Key
-    , creds : Creds
+    , creds : Login.Creds
     , loginStatus : LoginStatus
-    }
-
-
-type alias Creds =
-    { email : String
-    , password : String
     }
 
 
@@ -57,7 +52,7 @@ init : () -> Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     ( { page = urlToPage url
       , key = key
-      , creds = { email = "", password = "" }
+      , creds = Login.init
       , loginStatus = Ready
       }
     , Cmd.none
@@ -67,8 +62,7 @@ init flags url key =
 type Msg
     = ClickedLink Browser.UrlRequest
     | ChangedUrl Url
-    | SetPassword String
-    | SetEmail String
+    | LoginMsg Login.Msg
     | OnLogin
     | OnLoginSuccess LoginResponse
     | OnLoginError LoginResponse
@@ -93,11 +87,9 @@ type LoginStatus
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        SetPassword password ->
-            ( { model | creds = { email = model.creds.email, password = password } }, Cmd.none )
-
-        SetEmail email ->
-            ( { model | creds = { email = email, password = model.creds.password } }, Cmd.none )
+        LoginMsg loginMsg ->
+            Login.update loginMsg model.creds
+                |> (\( newCred, cmd ) -> ( { model | creds = newCred }, cmd ))
 
         ChangedUrl url ->
             ( { model | page = urlToPage url }, Cmd.none )
@@ -181,8 +173,7 @@ viewLogin model =
         [ div [ classList [ ( "form", True ), ( "error", model.loginStatus == LoginError ) ] ]
             [ viewLoginStatus model.loginStatus
             , h3 [] [ text "Log in to Lean Watch" ]
-            , input [ type_ "email", tabindex 1, autofocus True, placeholder "Enter email", value model.creds.email, onInput SetEmail ] []
-            , input [ type_ "password", tabindex 2, placeholder "Enter password", value model.creds.password, onInput SetPassword ] []
+            , Login.viewEmailAndPassword model.creds |> Html.map LoginMsg
             , button [ class "button flat", classIf isLoading "disabled", disabled isLoading, tabindex 3, onClickIf (not isLoading) OnLogin ] [ span [ classIf isLoading "spinner-border" ] [], text "Log In" ]
             , div [ class "or-label" ] [ text "OR" ]
             , button [ class "button material", tabindex 4 ] [ img [ class "google-icon", src "/icons/google.svg" ] [], text "Log in with Google" ]
