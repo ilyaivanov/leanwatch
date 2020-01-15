@@ -12,6 +12,7 @@
     />
     <title>My Spa</title>
     <script type="text/javascript" src="/elm.js"></script>
+    <script type="text/javascript" src="/elmPorts.js"></script>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
@@ -19,6 +20,7 @@
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <script>
       var app = Elm.Spa.init({ node: document.getElementById("app") });
+      registerPorts(app.ports)
     </script>
 
   </body>
