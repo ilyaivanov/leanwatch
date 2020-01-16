@@ -53,12 +53,9 @@ type alias BoardsResponse =
     }
 
 
-createBoardsModel : BoardsResponse -> Board.Model
-createBoardsModel boardResponse =
+createBoardsModel : BoardsResponse -> Board.Model -> Board.Model
+createBoardsModel boardResponse model =
     let
-        model =
-            Board.init
-
         allBoards =
             boardResponse.boards
 
@@ -135,9 +132,12 @@ update msg model =
                             Nav.pushUrl model.key "/"
 
                         loadBoardsAction =
-                            loadBoards res.token
+                            loadBoards "hardcoded token"
+
+                        newBoard =
+                            model.board
                     in
-                    ( { model | login = nextLoginModel }, Cmd.batch [ goToRoot, loadBoardsAction ] )
+                    ( { model | login = nextLoginModel, board = { newBoard | userInfo = Just res } }, Cmd.batch [ goToRoot, loadBoardsAction ] )
 
                 _ ->
                     Login.update loginMsg model.login
@@ -148,7 +148,7 @@ update msg model =
                 |> (\( board, cmd ) -> ( { model | board = board }, cmd |> Cmd.map BoardMsg ))
 
         BoardsLoaded boards ->
-            ( { model | board = createBoardsModel boards }, Cmd.none )
+            ( { model | board = createBoardsModel boards model.board }, Cmd.none )
 
         ChangedUrl url ->
             ( { model | page = urlToPage url }, Cmd.none )

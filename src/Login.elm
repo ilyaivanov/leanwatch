@@ -41,8 +41,7 @@ init : Model
 init =
     { email = ""
     , password = ""
-    , loginStatus = Ready
-    , token = Nothing
+    , loginStatus = Anonymous
     }
 
 
@@ -50,18 +49,20 @@ type alias Model =
     { email : String
     , password : String
     , loginStatus : LoginStatus
-    , token : Maybe Token
     }
 
 
 type LoginStatus
-    = Ready
+    = Anonymous
+    | LoggedIn LoginSuccessResponse
     | Loading
     | LoginError
 
 
 type alias LoginSuccessResponse =
-    { token : String
+    { displayName : String
+    , photoURL : String
+    , email : String
     }
 
 
@@ -87,7 +88,7 @@ update msg model =
             ( { model | loginStatus = Loading }, login { email = model.email, password = model.password } )
 
         OnLoginSuccess res ->
-            ( { model | loginStatus = Ready, token = Just (Token res.token) }, Cmd.none )
+            ( { model | loginStatus = LoggedIn res }, Cmd.none )
 
         OnLoginError res ->
             ( { model | loginStatus = LoginError }, Cmd.none )

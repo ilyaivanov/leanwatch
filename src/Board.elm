@@ -8,6 +8,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import List.Extra exposing (findIndex, splitAt)
+import Login
 import Process
 import Random
 import Task
@@ -27,6 +28,7 @@ type alias Model =
     , stacks : Dict String Stack
     , items : Dict String Item
     , boardsOrder : List String
+    , userInfo : Maybe Login.LoginSuccessResponse
     , selectedBoard : String
     , videoBeingPlayed : Maybe String
 
@@ -95,6 +97,7 @@ init =
     , selectedBoard = ""
     , boardsOrder = []
     , dragState = NoDrag
+    , userInfo = Nothing
     , searchTerm = ""
     , currentSearchId = ""
     , videoBeingPlayed = Nothing
@@ -534,8 +537,19 @@ view model =
 viewTopBar : Model -> Html Msg
 viewTopBar model =
     div [ class "top-bar" ]
-        [ button [ classIf (isBoards model.sidebarState) "active", onClick ShowBoards ] [ text "boards" ]
-        , button [ classIf (isSearch model.sidebarState) "active", onClick ShowSearch ] [ text "search" ]
+        [ div []
+            [ button [ classIf (isBoards model.sidebarState) "active", onClick ShowBoards ] [ text "boards" ]
+            , button [ classIf (isSearch model.sidebarState) "active", onClick ShowSearch ] [ text "search" ]
+            ]
+        , Maybe.map viewUser model.userInfo |> Maybe.withDefault (div [] [])
+        ]
+
+
+viewUser : Login.LoginSuccessResponse -> Html Msg
+viewUser loginInfo =
+    div [ class "user-info-container" ]
+        [ span [] [ text loginInfo.displayName ]
+        , img [ class "user-info-image", src loginInfo.photoURL ] []
         ]
 
 

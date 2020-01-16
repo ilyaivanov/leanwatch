@@ -2,32 +2,36 @@ function registerPorts(ports) {
   if (ports.login) {
     ports.login.subscribe(function (creds) {
 
-      console.log('Performing login with', creds);
-      setTimeout(function () {
-        if (creds.email === "ilya")
-          ports.onLoginSuccess.send({token: "myToken"});
-        else
-          ports.onLoginError.send({errorMessage: "some error reason"});
-      }, 2000);
+      if (FAKED_BACKEND)
+        ports.onLoginSuccess.send(dummyUser);
+      else {
+        const auth = firebase.auth();
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider);
+        auth.onAuthStateChanged(function (state) {
+          console.log(state);
+        });
+
+      }
     });
   }
 
 
   if (ports.loadBoards) {
     ports.loadBoards.subscribe(function (userToken) {
-
-      console.log('Loading boards for ', userToken);
-
-      if (userToken === "myToken") {
-
         setTimeout(function () {
           ports.onBoardsResponse.send(boardsModelResponse);
-        }, 2000);
-      }
+        }, 200);
     });
   }
 }
 
+const FAKED_BACKEND = true;
+const dummyUser = {
+  displayName: "Ilya Ivanov",
+  photoURL: "https://lh3.googleusercontent.com/a-/AAuE7mAflEBpew4MQ8o0BJeeBU_1XFyiHa-8aDqgRd1MPg",
+  email: "static.ila@gmail.com",
+};
 
 const boardsModelResponse = {
   selectedBoard: "BOARD_1",

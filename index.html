@@ -13,6 +13,23 @@
     <title>My Spa</title>
     <script type="text/javascript" src="/elm.js"></script>
     <script type="text/javascript" src="/elmPorts.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.6.2/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.6.2/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.6.2/firebase-auth.js"></script>
+    <script>
+      var firebaseConfig = {
+        apiKey: "AIzaSyBIMlkTBSum238XfsQyXjjjXvbVkwLHbKw",
+        authDomain: "lean-watch.firebaseapp.com",
+        databaseURL: "https://lean-watch.firebaseio.com",
+        projectId: "lean-watch",
+        storageBucket: "lean-watch.appspot.com",
+        messagingSenderId: "445985639106",
+        appId: "1:445985639106:web:5b5e956e2c1b6dae25495b",
+        measurementId: "G-L34EVFG3WN"
+      };
+      // Initialize Firebase
+      firebase.initializeApp(firebaseConfig);
+    </script>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
