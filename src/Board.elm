@@ -89,28 +89,16 @@ type Msg
 
 init : Model
 init =
-    { stacks =
-        Dict.fromList
-            [ ( "1", Stack "1" "My Stack 1" (createItems 1 5) )
-            , ( "2", Stack "2" "My Stack 42" (createItems 6 30) )
-            , ( "42", Stack "42" "My Stack 2" (createItems 31 35) )
-            , ( "Empty", Stack "Empty" "My Stack Empty" [] )
-            , ( "SEARCH", Stack "SEARCH" "SEARCH_STACK" (createItems 36 37) )
-            ]
-    , items = Dict.fromList (List.range 1 40 |> List.map String.fromInt |> List.map (\id -> ( id, { id = id, youtubeId = "WddpRmmAYkg", name = "Item NEW LOng long long very long text indeeo" ++ id } )))
+    { stacks = Dict.empty
+    , items = Dict.empty
+    , boards = Dict.empty
+    , selectedBoard = ""
+    , boardsOrder = []
     , dragState = NoDrag
     , searchTerm = ""
     , currentSearchId = ""
     , videoBeingPlayed = Nothing
     , sidebarState = Boards
-    , boards =
-        Dict.fromList
-            [ ( "BOARD1", { id = "BOARD1", name = "My Board", stacks = [ "1", "2" ] } )
-            , ( "BOARD2", { id = "BOARD2", name = "My Second Board", stacks = [ "42", "Empty" ] } )
-            , ( "BOARD3", { id = "BOARD3", name = "My Third Board", stacks = [] } )
-            ]
-    , selectedBoard = "BOARD1"
-    , boardsOrder = [ "BOARD3", "BOARD2", "BOARD1" ]
     }
 
 
@@ -526,14 +514,21 @@ notEquals a b =
 
 view : Model -> Html Msg
 view model =
-    div (attributesIf (shouldListenToMoveEvents model.dragState) [ onMouseMove MouseMove, onMouseUp MouseUp ])
-        [ viewTopBar model
-        , div []
-            [ viewSidebar model
-            , viewBoard (getBoardViewModel model) model
-            ]
-        , viewPlayer model
-        ]
+    case model.selectedBoard of
+        -- ugly assumption, but works for now. Consider using a separate precise state of loading
+        -- maybe even load your state progressively
+        "" ->
+            div [] [ text "Loading..." ]
+
+        _ ->
+            div (attributesIf (shouldListenToMoveEvents model.dragState) [ onMouseMove MouseMove, onMouseUp MouseUp ])
+                [ viewTopBar model
+                , div []
+                    [ viewSidebar model
+                    , viewBoard (getBoardViewModel model) model
+                    ]
+                , viewPlayer model
+                ]
 
 
 viewTopBar : Model -> Html Msg
@@ -708,25 +703,3 @@ viewPlayer model =
 
         Nothing ->
             div [] []
-
-
-
--- CSS HELPERS
-
-
-classIf : Bool -> String -> Attribute msg
-classIf condition className =
-    if condition then
-        class className
-
-    else
-        class ""
-
-
-attributesIf : Bool -> List (Attribute msg) -> List (Attribute msg)
-attributesIf condition attributes =
-    if condition then
-        attributes
-
-    else
-        []

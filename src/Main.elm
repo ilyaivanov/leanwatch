@@ -1,8 +1,9 @@
-module Main exposing (main)
+port module Main exposing (main)
 
 import Board as Board
 import Browser exposing (Document)
 import Browser.Navigation as Nav
+import Dict exposing (Dict)
 import Html exposing (Attribute, Html, div, text)
 import Login as Login
 import Url exposing (Url)
@@ -19,6 +20,64 @@ main =
         , update = update
         , view = view
         }
+
+
+port loadBoards : String -> Cmd msg
+
+
+port onBoardsResponse : (BoardsResponse -> msg) -> Sub msg
+
+
+
+-- NORMALIZATION to extract
+
+
+type alias BoardsResponse =
+    { selectedBoard : String
+    , boards :
+        List
+            { id : String
+            , name : String
+            , stacks :
+                List
+                    { id : String
+                    , name : String
+                    , items :
+                        List
+                            { id : String
+                            , name : String
+                            , youtubeId : String
+                            }
+                    }
+            }
+    }
+
+
+createBoardsModel : BoardsResponse -> Board.Model
+createBoardsModel boardResponse =
+    let
+        model =
+            Board.init
+
+        allBoards =
+            boardResponse.boards
+
+        allStacks =
+            List.map (\b -> b.stacks) allBoards |> List.concat
+
+        allItems =
+            List.map (\s -> s.items) allStacks |> List.concat
+
+        getIds =
+            List.map (\s -> s.id)
+    in
+    { model
+        | boards = Dict.fromList (List.map (\b -> ( b.id, Board.Board b.id b.name (getIds b.stacks) )) allBoards)
+        , stacks = Dict.fromList (List.map (\s -> ( s.id, Board.Stack s.id s.name (getIds s.items) )) allStacks)
+        , items = Dict.fromList (List.map (\i -> ( i.id, Board.Item i.id i.name i.youtubeId )) allItems)
+        , boardsOrder = getIds allBoards
+        , selectedBoard = boardResponse.selectedBoard
+    }
 
 
 
@@ -49,6 +108,7 @@ type Msg
     | ChangedUrl Url
     | LoginMsg Login.Msg
     | BoardMsg Board.Msg
+    | BoardsLoaded BoardsResponse
 
 
 type Page
@@ -70,8 +130,14 @@ update msg model =
                     let
                         nextLoginModel =
                             Login.update (Login.OnLoginSuccess res) model.login |> Tuple.first
+
+                        goToRoot =
+                            Nav.pushUrl model.key "/"
+
+                        loadBoardsAction =
+                            loadBoards res.token
                     in
-                    ( { model | login = nextLoginModel }, Nav.pushUrl model.key "/" )
+                    ( { model | login = nextLoginModel }, Cmd.batch [ goToRoot, loadBoardsAction ] )
 
                 _ ->
                     Login.update loginMsg model.login
@@ -80,6 +146,9 @@ update msg model =
         BoardMsg boardMsg ->
             Board.update boardMsg model.board
                 |> (\( board, cmd ) -> ( { model | board = board }, cmd |> Cmd.map BoardMsg ))
+
+        BoardsLoaded boards ->
+            ( { model | board = createBoardsModel boards }, Cmd.none )
 
         ChangedUrl url ->
             ( { model | page = urlToPage url }, Cmd.none )
@@ -96,10 +165,10 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Login.onLoginSuccess Login.OnLoginSuccess
-        , Login.onLoginError Login.OnLoginError
+        [ Login.onLoginSuccess Login.OnLoginSuccess |> Sub.map LoginMsg
+        , Login.onLoginError Login.OnLoginError |> Sub.map LoginMsg
+        , onBoardsResponse BoardsLoaded
         ]
-        |> Sub.map LoginMsg
 
 
 parser : Parser (Page -> a) a

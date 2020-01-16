@@ -15,18 +15,22 @@ type alias Creds =
     }
 
 
+type Token
+    = Token String
+
+
 type Msg
     = SetEmail String
     | SetPassword String
     | OnLogin
-    | OnLoginSuccess LoginResponse
-    | OnLoginError LoginResponse
+    | OnLoginSuccess LoginSuccessResponse
+    | OnLoginError LoginErrorResponse
 
 
-port onLoginSuccess : (LoginResponse -> msg) -> Sub msg
+port onLoginSuccess : (LoginSuccessResponse -> msg) -> Sub msg
 
 
-port onLoginError : (LoginResponse -> msg) -> Sub msg
+port onLoginError : (LoginErrorResponse -> msg) -> Sub msg
 
 
 
@@ -38,6 +42,7 @@ init =
     { email = ""
     , password = ""
     , loginStatus = Ready
+    , token = Nothing
     }
 
 
@@ -45,6 +50,7 @@ type alias Model =
     { email : String
     , password : String
     , loginStatus : LoginStatus
+    , token : Maybe Token
     }
 
 
@@ -54,8 +60,13 @@ type LoginStatus
     | LoginError
 
 
-type alias LoginResponse =
-    { foo : String
+type alias LoginSuccessResponse =
+    { token : String
+    }
+
+
+type alias LoginErrorResponse =
+    { errorMessage : String
     }
 
 
@@ -76,7 +87,7 @@ update msg model =
             ( { model | loginStatus = Loading }, login { email = model.email, password = model.password } )
 
         OnLoginSuccess res ->
-            ( { model | loginStatus = Ready }, Cmd.none )
+            ( { model | loginStatus = Ready, token = Just (Token res.token) }, Cmd.none )
 
         OnLoginError res ->
             ( { model | loginStatus = LoginError }, Cmd.none )
