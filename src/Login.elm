@@ -6,7 +6,7 @@ import Html.Attributes exposing (autofocus, class, classList, disabled, href, pl
 import Html.Events exposing (onInput)
 
 
-port login : Creds -> Cmd msg
+port googleSignin : () -> Cmd msg
 
 
 type alias Creds =
@@ -15,22 +15,14 @@ type alias Creds =
     }
 
 
-type Token
-    = Token String
-
-
 type Msg
     = SetEmail String
     | SetPassword String
-    | OnLogin
-    | OnLoginSuccess LoginSuccessResponse
-    | OnLoginError LoginErrorResponse
+    | OnLoginRequest
+    | OnLoginResponse LoginSuccessResponse
 
 
-port onLoginSuccess : (LoginSuccessResponse -> msg) -> Sub msg
-
-
-port onLoginError : (LoginErrorResponse -> msg) -> Sub msg
+port onLogin : (LoginSuccessResponse -> msg) -> Sub msg
 
 
 
@@ -84,14 +76,11 @@ update msg model =
         SetEmail email ->
             ( { model | email = email }, Cmd.none )
 
-        OnLogin ->
-            ( { model | loginStatus = Loading }, login { email = model.email, password = model.password } )
+        OnLoginRequest ->
+            ( { model | loginStatus = Loading }, googleSignin () )
 
-        OnLoginSuccess res ->
+        OnLoginResponse res ->
             ( { model | loginStatus = LoggedIn res }, Cmd.none )
-
-        OnLoginError res ->
-            ( { model | loginStatus = LoginError }, Cmd.none )
 
 
 
@@ -110,7 +99,7 @@ viewLogin model =
             , h3 [] [ text "Log in to Lean Watch" ]
             , input [ type_ "email", tabindex 1, autofocus True, placeholder "Enter email", value model.email, onInput SetEmail ] []
             , input [ type_ "password", tabindex 2, placeholder "Enter password", value model.password, onInput SetPassword ] []
-            , button [ class "button flat", classIf isLoading "disabled", disabled isLoading, tabindex 3, onClickIf (not isLoading) OnLogin ] [ span [ classIf isLoading "spinner-border" ] [], text "Log In" ]
+            , button [ class "button flat", classIf isLoading "disabled", disabled isLoading, tabindex 3, onClickIf (not isLoading) OnLoginRequest ] [ span [ classIf isLoading "spinner-border" ] [], text "Log In" ]
             , div [ class "or-label" ] [ text "OR" ]
             , button [ class "button material", tabindex 4 ] [ img [ class "google-icon", src "/icons/google.svg" ] [], text "Log in with Google" ]
             , div [ class "line" ] []

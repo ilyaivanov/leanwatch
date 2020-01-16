@@ -1,37 +1,40 @@
 function registerPorts(ports) {
-  if (ports.login) {
-    ports.login.subscribe(function (creds) {
+  const auth = firebase.auth();
+  const provider = new firebase.auth.GoogleAuthProvider();
 
-      if (FAKED_BACKEND)
-        ports.onLoginSuccess.send(dummyUser);
-      else {
-        const auth = firebase.auth();
-        const provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider);
-        auth.onAuthStateChanged(function (state) {
-          console.log(state);
-        });
-
-      }
-    });
-  }
+  auth.onAuthStateChanged(function (user) {
+    const portName = user ? 'onLogin' : 'onLogout';
+    callPort(ports, portName, user);
+  });
+  subscribeToPort(ports, 'googleSignin', function () {
+    auth.signInWithPopup(provider);
+  });
 
 
   if (ports.loadBoards) {
     ports.loadBoards.subscribe(function (userToken) {
-        setTimeout(function () {
-          ports.onBoardsResponse.send(boardsModelResponse);
-        }, 200);
+      setTimeout(function () {
+        ports.onBoardsResponse.send(boardsModelResponse);
+      }, 200);
     });
   }
 }
 
-const FAKED_BACKEND = true;
-const dummyUser = {
-  displayName: "Ilya Ivanov",
-  photoURL: "https://lh3.googleusercontent.com/a-/AAuE7mAflEBpew4MQ8o0BJeeBU_1XFyiHa-8aDqgRd1MPg",
-  email: "static.ila@gmail.com",
-};
+
+function subscribeToPort(app, portName, handler) {
+  if (!app[portName]) {
+    console.error('Port ' + portName + " doesn't exist on ", app);
+  } else
+    app[portName].subscribe(handler);
+}
+
+function callPort(app, portName, data) {
+  if (!app[portName]) {
+    console.error('Port ' + portName + " doesn't exist on ", app);
+  } else
+    app[portName].send(data);
+}
+
 
 const boardsModelResponse = {
   selectedBoard: "BOARD_1",

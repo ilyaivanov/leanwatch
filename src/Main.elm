@@ -123,10 +123,10 @@ update msg model =
     case msg of
         LoginMsg loginMsg ->
             case loginMsg of
-                Login.OnLoginSuccess res ->
+                Login.OnLoginResponse res ->
                     let
                         nextLoginModel =
-                            Login.update (Login.OnLoginSuccess res) model.login |> Tuple.first
+                            Login.update (Login.OnLoginResponse res) model.login |> Tuple.first
 
                         goToRoot =
                             Nav.pushUrl model.key "/"
@@ -165,8 +165,7 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Login.onLoginSuccess Login.OnLoginSuccess |> Sub.map LoginMsg
-        , Login.onLoginError Login.OnLoginError |> Sub.map LoginMsg
+        [ Login.onLogin Login.OnLoginResponse |> Sub.map LoginMsg
         , onBoardsResponse BoardsLoaded
         ]
 
