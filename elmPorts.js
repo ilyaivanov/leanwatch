@@ -3,8 +3,10 @@ function registerPorts(ports) {
   const provider = new firebase.auth.GoogleAuthProvider();
 
   auth.onAuthStateChanged(function (user) {
-    const portName = user ? 'onLogin' : 'onLogout';
-    callPort(ports, portName, user);
+    if (user)
+      callPort(ports, 'onLogin', user);
+    else
+      callPort(ports, 'onLogout', "ignored value");
   });
   subscribeToPort(ports, 'googleSignin', function () {
     auth.signInWithPopup(provider);
