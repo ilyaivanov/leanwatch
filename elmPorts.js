@@ -1,25 +1,39 @@
+const auth = firebase.auth();
+const firestore = firebase.firestore();
+
 function registerPorts(ports) {
-  const auth = firebase.auth();
+
   const provider = new firebase.auth.GoogleAuthProvider();
 
   auth.onAuthStateChanged(function (user) {
-    if (user)
+    if (user) {
       callPort(ports, 'onLogin', user);
-    else
+      handleUserLogin(user, userProfile => ports.onUserProfileLoaded.send(userProfile));
+    } else
       callPort(ports, 'onLogout', "ignored value");
   });
   subscribeToPort(ports, 'googleSignin', function () {
     auth.signInWithPopup(provider);
   });
+}
 
-
-  if (ports.loadBoards) {
-    ports.loadBoards.subscribe(function (userToken) {
-      setTimeout(function () {
-        ports.onBoardsResponse.send(boardsModelResponse);
-      }, 200);
-    });
-  }
+function handleUserLogin(user, onSuccess) {
+  const userRef = firestore.doc('users/' + user.uid);
+  userRef.get().then(function (snapshot) {
+    console.log(snapshot);
+    if (snapshot.exists) {
+      onSuccess({id: snapshot.id, ...snapshot.data()});
+    } else {
+      const newBoard = firestore.collection('boards').doc();
+      newBoard.set(defaultBoard);
+      const newProfile = {
+        boards: [{id: newBoard.id, name: defaultBoard.name}],
+        selectedBoard: newBoard.id,
+      };
+      userRef.set(newProfile);
+      onSuccess({id: userRef.id, ...newProfile});
+    }
+  });
 }
 
 
@@ -38,23 +52,24 @@ function callPort(app, portName, data) {
 }
 
 
+const defaultBoard = {
+  name: "First Board",
+  stacks: [
+    {
+      id: "STACK_1",
+      name: "FirstStack",
+      items: [
+        {
+          id: "ITEM_1",
+          name: "first item",
+          youtubeId: "WddpRmmAYkg",
+        },
+      ],
+    },
+  ],
+};
+
 const boardsModelResponse = {
   selectedBoard: "BOARD_1",
-  boards: [{
-    id: "BOARD_1",
-    name: "First Board",
-    stacks: [
-      {
-        id: "STACK_1",
-        name: "FirstStack",
-        items: [
-          {
-            id: "ITEM_1",
-            name: "first item",
-            youtubeId: "WddpRmmAYkg",
-          },
-        ],
-      },
-    ],
-  }],
+  boards: [{...defaultBoard, id: "TEMP ID"}],
 };

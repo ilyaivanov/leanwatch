@@ -27,10 +27,9 @@ type alias Model =
     { boards : Dict String Board
     , stacks : Dict String Stack
     , items : Dict String Item
-    , boardsOrder : List String
     , userInfo : Maybe Login.LoginSuccessResponse
-    , selectedBoard : String
     , videoBeingPlayed : Maybe String
+    , userProfile : UserProfile
 
     -- UI STATE
     , sidebarState : SidebarState
@@ -87,6 +86,7 @@ type Msg
     | ShowBoards
       -- Board Management
     | SelectBoard String
+    | UserProfileLoaded UserProfile
 
 
 init : Model
@@ -94,8 +94,10 @@ init =
     { stacks = Dict.empty
     , items = Dict.empty
     , boards = Dict.empty
-    , selectedBoard = ""
-    , boardsOrder = []
+    , userProfile =
+        { selectedBoard = ""
+        , boards = []
+        }
     , dragState = NoDrag
     , userInfo = Nothing
     , searchTerm = ""
@@ -112,16 +114,21 @@ type alias Stack =
     }
 
 
+type alias UserProfile =
+    { boards : List BoardInfo
+    , selectedBoard : String
+    }
+
+
+type alias BoardInfo =
+    { id : String, name : String }
+
+
 type alias Item =
     { id : String
     , name : String
     , youtubeId : String
     }
-
-
-createItems : Int -> Int -> List String
-createItems from to =
-    List.map (\n -> String.fromInt n) (List.range from to)
 
 
 isDraggingStack : DragState -> String -> Bool
@@ -139,16 +146,6 @@ isDraggingItem dragState { id } =
     case dragState of
         DraggingItem _ _ itemBeingDragged ->
             itemBeingDragged == id
-
-        _ ->
-            False
-
-
-isDraggingAnyItem : DragState -> Bool
-isDraggingAnyItem dragState =
-    case dragState of
-        DraggingItem _ _ _ ->
-            True
 
         _ ->
             False
@@ -245,16 +242,9 @@ isHidden state =
             False
 
 
-getBoardsInOrder : Model -> List Board
-getBoardsInOrder model =
-    model.boardsOrder
-        |> List.map (\boardId -> Dict.get boardId model.boards)
-        |> unpackMaybes
-
-
 getBoardViewModel : Model -> Board
 getBoardViewModel model =
-    Dict.get model.selectedBoard model.boards |> Maybe.withDefault { id = "", name = "NNOT_FOUND", stacks = [] }
+    Dict.get model.userProfile.selectedBoard model.boards |> Maybe.withDefault { id = "", name = "NNOT_FOUND", stacks = [] }
 
 
 
@@ -391,7 +381,7 @@ update msg model =
         CreateStack newStackId ->
             noComand
                 { model
-                    | boards = updateBoard model.selectedBoard (\b -> { b | stacks = List.append b.stacks [ newStackId ] }) model.boards
+                    | boards = updateBoard model.userProfile.selectedBoard (\b -> { b | stacks = List.append b.stacks [ newStackId ] }) model.boards
                     , stacks = Dict.insert newStackId (Stack newStackId "New Stack" []) model.stacks
                 }
 
@@ -436,7 +426,14 @@ update msg model =
             noComand { model | sidebarState = Hidden }
 
         SelectBoard boardId ->
-            noComand { model | selectedBoard = boardId }
+            let
+                profile =
+                    model.userProfile
+            in
+            noComand { model | userProfile = { profile | selectedBoard = boardId } }
+
+        UserProfileLoaded profile ->
+            noComand { model | userProfile = profile }
 
         Noop ->
             noComand model
@@ -459,14 +456,14 @@ moveStackToAnotherPosition : Model -> String -> String -> Dict String Board
 moveStackToAnotherPosition model stackOver stackUnder =
     let
         board =
-            Dict.get model.selectedBoard model.boards |> Maybe.withDefault { id = "", name = "", stacks = [] }
+            Dict.get model.userProfile.selectedBoard model.boards |> Maybe.withDefault { id = "", name = "", stacks = [] }
 
         targetIndex =
             findIndex (equals stackUnder) board.stacks |> Maybe.withDefault -1
     in
     model.boards
-        |> updateBoard model.selectedBoard (\s -> { s | stacks = removeItem stackOver s.stacks })
-        |> updateBoard model.selectedBoard (\s -> { s | stacks = insertInto targetIndex stackOver s.stacks })
+        |> updateBoard model.userProfile.selectedBoard (\s -> { s | stacks = removeItem stackOver s.stacks })
+        |> updateBoard model.userProfile.selectedBoard (\s -> { s | stacks = insertInto targetIndex stackOver s.stacks })
 
 
 updateStack : String -> (Stack -> Stack) -> Dict String Stack -> Dict String Stack
@@ -517,7 +514,7 @@ notEquals a b =
 
 view : Model -> Html Msg
 view model =
-    case model.selectedBoard of
+    case model.userProfile.selectedBoard of
         -- ugly assumption, but works for now. Consider using a separate precise state of loading
         -- maybe even load your state progressively
         "" ->
@@ -641,12 +638,12 @@ viewBoards model =
         [ h3 [] [ text "Boards" ]
         , button [ onClick HideSidebar ] [ text "<" ]
         ]
-    , div [] (getBoardsInOrder model |> List.map (viewBoardButton model))
+    , div [] (model.userProfile.boards |> List.map (viewBoardButton model))
     ]
 
 
 viewBoardButton model { name, id } =
-    div [ class "sidebar-boards-button", classIf (model.selectedBoard == id) "active", onClick (SelectBoard id) ] [ text name ]
+    div [ class "sidebar-boards-button", classIf (model.userProfile.selectedBoard == id) "active", onClick (SelectBoard id) ] [ text name ]
 
 
 viewItem : List (Attribute Msg) -> Bool -> Item -> Html Msg
