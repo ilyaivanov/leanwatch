@@ -15,6 +15,13 @@ function registerPorts(ports) {
   subscribeToPort(ports, 'googleSignin', function () {
     auth.signInWithPopup(provider);
   });
+
+  subscribeToPort(ports, 'loadBoard', function (boardId) {
+    console.log('LOADING BOARD ' + boardId);
+    firestore.collection('boards').doc(boardId).get().then(snapshot => {
+      callPort(ports, 'onBoardLoaded', {...snapshot.data(), id: snapshot.id});
+    });
+  });
 }
 
 function handleUserLogin(user, onSuccess) {

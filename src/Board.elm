@@ -25,14 +25,14 @@ port loadBoard : String -> Cmd msg
 port onUserProfileLoaded : (UserProfile -> msg) -> Sub msg
 
 
-port onBoardLoaded : (BoardsResponse -> msg) -> Sub msg
+port onBoardLoaded : (BoardResponse -> msg) -> Sub msg
 
 
 
 -- NORMALIZATION to extract
 
 
-type alias BoardsResponse =
+type alias BoardResponse =
     { id : String
     , name : String
     , stacks :
@@ -49,32 +49,29 @@ type alias BoardsResponse =
     }
 
 
+mergeAndNormalizeResponse : BoardResponse -> Model -> Model
+mergeAndNormalizeResponse boardResponse model =
+    let
+        stacks =
+            Dict.fromList (List.map (\s -> ( s.id, Stack s.id s.name (getIds s.items) )) boardResponse.stacks)
 
---
---
---createBoardsModel : BoardsResponse -> Board.Model -> Board.Model
---createBoardsModel boardResponse model =
---    let
---        allBoards =
---            boardResponse.boards
---
---        allStacks =
---            List.map (\b -> b.stacks) allBoards |> List.concat
---
---        allItems =
---            List.map (\s -> s.items) allStacks |> List.concat
---
---        getIds =
---            List.map (\s -> s.id)
---    in
---    { model
---        | boards = Dict.fromList (List.map (\b -> ( b.id, Board.Board b.id b.name (getIds b.stacks) )) allBoards)
---        , stacks = Dict.fromList (List.map (\s -> ( s.id, Board.Stack s.id s.name (getIds s.items) )) allStacks)
---        , items = Dict.fromList (List.map (\i -> ( i.id, Board.Item i.id i.name i.youtubeId )) allItems)
---        , boardsOrder = getIds allBoards
---        , selectedBoard = boardResponse.selectedBoard
---    }
---
+        allItems =
+            boardResponse.stacks |> List.map (\s -> s.items) |> List.concat
+
+        items =
+            Dict.fromList (List.map (\i -> ( i.id, { id = i.id, name = i.name, youtubeId = i.youtubeId } )) allItems)
+
+        getIds =
+            List.map (\s -> s.id)
+    in
+    { model
+        | boards = Dict.insert boardResponse.id (Board boardResponse.id boardResponse.name (getIds boardResponse.stacks)) model.boards
+        , stacks = Dict.union stacks model.stacks
+        , items = Dict.union items model.items
+    }
+
+
+
 -- MODEL
 
 
@@ -142,6 +139,7 @@ type Msg
       -- Board Management
     | SelectBoard String
     | UserProfileLoaded UserProfile
+    | BoardLoaded BoardResponse
 
 
 init : Model
@@ -297,9 +295,9 @@ isHidden state =
             False
 
 
-getBoardViewModel : Model -> Board
+getBoardViewModel : Model -> Maybe Board
 getBoardViewModel model =
-    Dict.get model.userProfile.selectedBoard model.boards |> Maybe.withDefault { id = "", name = "NNOT_FOUND", stacks = [] }
+    Dict.get model.userProfile.selectedBoard model.boards
 
 
 
@@ -481,14 +479,32 @@ update msg model =
             noComand { model | sidebarState = Hidden }
 
         SelectBoard boardId ->
-            let
-                profile =
-                    model.userProfile
-            in
-            noComand { model | userProfile = { profile | selectedBoard = boardId } }
+            if boardId == model.userProfile.selectedBoard then
+                ( model, Cmd.none )
+
+            else
+                let
+                    profile =
+                        model.userProfile
+
+                    selectedBoard =
+                        Dict.get boardId model.boards
+
+                    action =
+                        case selectedBoard of
+                            Just _ ->
+                                Cmd.none
+
+                            Nothing ->
+                                loadBoard boardId
+                in
+                ( { model | userProfile = { profile | selectedBoard = boardId } }, action )
 
         UserProfileLoaded profile ->
-            noComand { model | userProfile = profile }
+            ( { model | userProfile = profile }, loadBoard profile.selectedBoard )
+
+        BoardLoaded board ->
+            noComand (mergeAndNormalizeResponse board model)
 
         Noop ->
             noComand model
@@ -573,14 +589,14 @@ view model =
         -- ugly assumption, but works for now. Consider using a separate precise state of loading
         -- maybe even load your state progressively
         "" ->
-            div [] [ text "Loading..." ]
+            div [] [ text "Loading user profile..." ]
 
         _ ->
             div (attributesIf (shouldListenToMoveEvents model.dragState) [ onMouseMove MouseMove, onMouseUp MouseUp ])
                 [ viewTopBar model
                 , div []
                     [ viewSidebar model
-                    , viewBoard (getBoardViewModel model) model
+                    , viewBoard model
                     ]
                 , viewPlayer model
                 ]
@@ -605,25 +621,30 @@ viewUser loginInfo =
         ]
 
 
-viewBoard : Board -> Model -> Html Msg
-viewBoard board model =
-    div
-        [ class "board"
-        , classIf (not (isHidden model.sidebarState)) "board-with-sidebar"
-        , classIf (isDraggingAnything model.dragState) "board-during-drag"
-        ]
-        [ viewBoardBar board
-        , div
-            [ class "columns-container" ]
-            (List.append
-                (board.stacks
-                    |> List.map (\stackId -> Dict.get stackId model.stacks)
-                    |> unpackMaybes
-                    |> List.map (\stack -> viewStack model.dragState [ class "column-board" ] (getStackToView model stack.id))
-                )
-                [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ], viewElementBeingDragged model ]
-            )
-        ]
+viewBoard : Model -> Html Msg
+viewBoard model =
+    case getBoardViewModel model of
+        Just board ->
+            div
+                [ class "board"
+                , classIf (not (isHidden model.sidebarState)) "board-with-sidebar"
+                , classIf (isDraggingAnything model.dragState) "board-during-drag"
+                ]
+                [ viewBoardBar board
+                , div
+                    [ class "columns-container" ]
+                    (List.append
+                        (board.stacks
+                            |> List.map (\stackId -> Dict.get stackId model.stacks)
+                            |> unpackMaybes
+                            |> List.map (\stack -> viewStack model.dragState [ class "column-board" ] (getStackToView model stack.id))
+                        )
+                        [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ], viewElementBeingDragged model ]
+                    )
+                ]
+
+        Nothing ->
+            div [] [ text "Loading BOARD" ]
 
 
 viewBoardBar : Board -> Html Msg
