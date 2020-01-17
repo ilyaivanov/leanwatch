@@ -1,4 +1,4 @@
-module Board exposing (..)
+port module Board exposing (..)
 
 import Dict exposing (Dict)
 import Embed.Youtube
@@ -19,7 +19,62 @@ noComand model =
     ( model, Cmd.none )
 
 
+port loadBoard : String -> Cmd msg
 
+
+port onUserProfileLoaded : (UserProfile -> msg) -> Sub msg
+
+
+port onBoardLoaded : (BoardsResponse -> msg) -> Sub msg
+
+
+
+-- NORMALIZATION to extract
+
+
+type alias BoardsResponse =
+    { id : String
+    , name : String
+    , stacks :
+        List
+            { id : String
+            , name : String
+            , items :
+                List
+                    { id : String
+                    , name : String
+                    , youtubeId : String
+                    }
+            }
+    }
+
+
+
+--
+--
+--createBoardsModel : BoardsResponse -> Board.Model -> Board.Model
+--createBoardsModel boardResponse model =
+--    let
+--        allBoards =
+--            boardResponse.boards
+--
+--        allStacks =
+--            List.map (\b -> b.stacks) allBoards |> List.concat
+--
+--        allItems =
+--            List.map (\s -> s.items) allStacks |> List.concat
+--
+--        getIds =
+--            List.map (\s -> s.id)
+--    in
+--    { model
+--        | boards = Dict.fromList (List.map (\b -> ( b.id, Board.Board b.id b.name (getIds b.stacks) )) allBoards)
+--        , stacks = Dict.fromList (List.map (\s -> ( s.id, Board.Stack s.id s.name (getIds s.items) )) allStacks)
+--        , items = Dict.fromList (List.map (\i -> ( i.id, Board.Item i.id i.name i.youtubeId )) allItems)
+--        , boardsOrder = getIds allBoards
+--        , selectedBoard = boardResponse.selectedBoard
+--    }
+--
 -- MODEL
 
 

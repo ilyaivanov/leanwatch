@@ -1,5 +1,6 @@
 port module Login exposing (..)
 
+import Browser.Navigation as Nav
 import ExtraEvents exposing (classIf, onClickIf)
 import Html exposing (Attribute, Html, a, button, div, h3, img, input, span, text)
 import Html.Attributes exposing (autofocus, class, classList, disabled, href, placeholder, src, tabindex, type_, value)
@@ -71,8 +72,8 @@ type alias LoginErrorResponse =
 --UPDATE
 
 
-update : Msg -> Model -> ( Model, Cmd msg )
-update msg model =
+update : Msg -> Model -> Nav.Key -> ( Model, Cmd msg )
+update msg model key =
     case msg of
         SetPassword password ->
             ( { model | password = password }, Cmd.none )
@@ -84,10 +85,10 @@ update msg model =
             ( { model | loginStatus = Loading }, googleSignin () )
 
         OnLogin res ->
-            ( { model | loginStatus = LoggedIn res }, Cmd.none )
+            ( { model | loginStatus = LoggedIn res }, Nav.pushUrl key "/" )
 
         OnLogout res ->
-            ( { model | loginStatus = Anonymous }, Cmd.none )
+            ( { model | loginStatus = Anonymous }, Nav.pushUrl key "/login" )
 
 
 

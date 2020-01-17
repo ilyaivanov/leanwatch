@@ -20,7 +20,6 @@ function registerPorts(ports) {
 function handleUserLogin(user, onSuccess) {
   const userRef = firestore.doc('users/' + user.uid);
   userRef.get().then(function (snapshot) {
-    console.log(snapshot);
     if (snapshot.exists) {
       onSuccess({id: snapshot.id, ...snapshot.data()});
     } else {
