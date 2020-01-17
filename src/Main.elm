@@ -135,7 +135,16 @@ viewPage model =
             Login.viewLogin model.login |> Html.map LoginMsg
 
         Boards ->
-            Board.view model.board |> Html.map BoardMsg
+            let
+                loginStatus =
+                    case model.login.loginStatus of
+                        Login.LoggedIn status ->
+                            Just status
+
+                        _ ->
+                            Nothing
+            in
+            Board.view model.board loginStatus |> Html.map BoardMsg
 
         NotFound ->
             text "NotFound"

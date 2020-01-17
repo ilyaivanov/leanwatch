@@ -2,24 +2,21 @@ const auth = firebase.auth();
 const firestore = firebase.firestore();
 
 function registerPorts(ports) {
-
   const provider = new firebase.auth.GoogleAuthProvider();
 
   auth.onAuthStateChanged(function (user) {
     if (user) {
-      callPort(ports, 'onLogin', user);
+      ports.onLogin.send(user);
       handleUserLogin(user, userProfile => ports.onUserProfileLoaded.send(userProfile));
     } else
-      callPort(ports, 'onLogout', "ignored value");
-  });
-  subscribeToPort(ports, 'googleSignin', function () {
-    auth.signInWithPopup(provider);
+      ports.onLogout.send("ignored value");
   });
 
-  subscribeToPort(ports, 'loadBoard', function (boardId) {
-    console.log('LOADING BOARD ' + boardId);
+  ports.googleSignin.subscribe(() => auth.signInWithPopup(provider));
+
+  ports.loadBoard.subscribe(function (boardId) {
     firestore.collection('boards').doc(boardId).get().then(snapshot => {
-      callPort(ports, 'onBoardLoaded', {...snapshot.data(), id: snapshot.id});
+      ports.onBoardLoaded.send({...snapshot.data(), id: snapshot.id});
     });
   });
 }
@@ -43,21 +40,6 @@ function handleUserLogin(user, onSuccess) {
 }
 
 
-function subscribeToPort(app, portName, handler) {
-  if (!app[portName]) {
-    console.error('Port ' + portName + " doesn't exist on ", app);
-  } else
-    app[portName].subscribe(handler);
-}
-
-function callPort(app, portName, data) {
-  if (!app[portName]) {
-    console.error('Port ' + portName + " doesn't exist on ", app);
-  } else
-    app[portName].send(data);
-}
-
-
 const defaultBoard = {
   name: "First Board",
   stacks: [
@@ -73,9 +55,4 @@ const defaultBoard = {
       ],
     },
   ],
-};
-
-const boardsModelResponse = {
-  selectedBoard: "BOARD_1",
-  boards: [{...defaultBoard, id: "TEMP ID"}],
 };

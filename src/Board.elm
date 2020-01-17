@@ -79,7 +79,6 @@ type alias Model =
     { boards : Dict String Board
     , stacks : Dict String Stack
     , items : Dict String Item
-    , userInfo : Maybe Login.LoginSuccessResponse
     , videoBeingPlayed : Maybe String
     , userProfile : UserProfile
 
@@ -152,7 +151,6 @@ init =
         , boards = []
         }
     , dragState = NoDrag
-    , userInfo = Nothing
     , searchTerm = ""
     , currentSearchId = ""
     , videoBeingPlayed = Nothing
@@ -583,8 +581,8 @@ notEquals a b =
 -- VIEW
 
 
-view : Model -> Html Msg
-view model =
+view : Model -> Maybe Login.LoginSuccessResponse -> Html Msg
+view model login =
     case model.userProfile.selectedBoard of
         -- ugly assumption, but works for now. Consider using a separate precise state of loading
         -- maybe even load your state progressively
@@ -593,7 +591,7 @@ view model =
 
         _ ->
             div (attributesIf (shouldListenToMoveEvents model.dragState) [ onMouseMove MouseMove, onMouseUp MouseUp ])
-                [ viewTopBar model
+                [ viewTopBar model login
                 , div []
                     [ viewSidebar model
                     , viewBoard model
@@ -602,14 +600,14 @@ view model =
                 ]
 
 
-viewTopBar : Model -> Html Msg
-viewTopBar model =
+viewTopBar : Model -> Maybe Login.LoginSuccessResponse -> Html Msg
+viewTopBar model login =
     div [ class "top-bar" ]
         [ div []
             [ button [ classIf (isBoards model.sidebarState) "active", onClick ShowBoards ] [ text "boards" ]
             , button [ classIf (isSearch model.sidebarState) "active", onClick ShowSearch ] [ text "search" ]
             ]
-        , Maybe.map viewUser model.userInfo |> Maybe.withDefault (div [] [])
+        , Maybe.map viewUser login |> Maybe.withDefault (div [] [])
         ]
 
 
