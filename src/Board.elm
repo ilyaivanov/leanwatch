@@ -777,11 +777,18 @@ viewBoards model =
         , button [ onClick HideSidebar ] [ text "<" ]
         ]
     , div [] (model.userProfile.boards |> List.map (viewBoardButton model))
+    , div [] [ button [] [ text "Add" ] ]
     ]
 
 
 viewBoardButton model { name, id } =
-    div [ class "sidebar-boards-button", classIf (model.userProfile.selectedBoard == id) "active", onClick (SelectBoard id) ] [ text name ]
+    div [ class "sidebar-boards-button", classIf (model.userProfile.selectedBoard == id) "active", onClick (SelectBoard id) ]
+        [ text name
+        , div [ class "sidebar-boards-button-actions" ]
+            [ button [] [ text "E" ]
+            , button [] [ text "X" ]
+            ]
+        ]
 
 
 viewItem : List (Attribute Msg) -> Bool -> Item -> Html Msg

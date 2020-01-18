@@ -71,6 +71,16 @@ body {
   padding-left: calc(var(--item-padding) + 4px);
   border-bottom: 1px lightgrey solid;
   cursor: pointer;
+  position: relative;
+}
+.sidebar-boards-button-actions{
+  display: none;
+  flex-direction: row;
+  position: absolute;
+  right: 0;
+}
+.sidebar-boards-button:hover .sidebar-boards-button-actions{
+  display: flex;
 }
 
 .sidebar-boards-button.active {

@@ -8,7 +8,12 @@ function registerPorts(ports) {
     });
     ports.onUserProfileLoaded.send({
       selectedBoard: "BOARD_1",
-      boards: [{id: 'BOARD_1', name: "First Board"}],
+      boards: [
+        {id: 'BOARD_1', name: "First Board"},
+        {id: 'BOARD_2', name: "Second Board"},
+        {id: 'BOARD_3', name: "Third Board"},
+
+      ],
     });
   }, 200);
 
@@ -22,8 +27,14 @@ function registerPorts(ports) {
 }
 
 const boards = {
-  "BOARD_1": {
-    id:'BOARD_1',
+  "BOARD_1": {...createDummyBoard()},
+  "BOARD_2": {...createDummyBoard(), id: "BOARD_2", name:"Second Board"},
+  "BOARD_3": {...createDummyBoard(), id: "BOARD_3", name:"Third Board"},
+};
+
+function createDummyBoard() {
+  return {
+    id: 'BOARD_1',
     name: "First Board",
     stacks: [
       {
@@ -38,5 +49,5 @@ const boards = {
         ],
       },
     ],
-  },
-};
+  };
+}
