@@ -7,6 +7,8 @@ import ExtraEvents exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
+import Http
+import Json.Decode as Json
 import List.Extra exposing (findIndex, splitAt)
 import Login
 import Process
@@ -145,10 +147,10 @@ type Msg
     | OnSearchInput String
       -- Commands
     | CreateSingleId
-    | OnSearchDone String (List String)
       -- Debounced search
     | AttemptToSearch String
     | DebouncedSearch String String
+    | GotItems (Result Http.Error SearchResponse)
       -- Sidebar
     | HideSidebar
     | ShowSearch
@@ -198,6 +200,11 @@ type alias Item =
     { id : String
     , name : String
     , youtubeId : String
+    }
+
+
+type alias SearchResponse =
+    { items : List Item
     }
 
 
@@ -467,24 +474,39 @@ update msg model =
             ( { model | currentSearchId = searchId }, Process.sleep 500 |> Task.perform (always (DebouncedSearch searchId model.searchTerm)) )
 
         DebouncedSearch id term ->
+            let
+                request =
+                    Http.get
+                        { url = "https://us-central1-lean-watch.cloudfunctions.net/getVideos?q=" ++ term
+                        , expect = Http.expectJson GotItems decodeItems
+                        }
+            in
             if id == model.currentSearchId then
-                ( { model | currentSearchId = "" }, Random.generate (OnSearchDone term) createIds )
+                ( { model | currentSearchId = "" }, request )
 
             else
                 ( model, Cmd.none )
 
-        OnSearchDone postfix ids ->
-            let
-                newItems =
-                    ids |> List.map (\id -> Item id ("ITEM " ++ postfix ++ String.slice 2 3 id) "b5SSHK-mIF8")
+        GotItems response ->
+            case response of
+                Ok body ->
+                    let
+                        newItems =
+                            body.items
 
-                newItemsDict =
-                    Dict.fromList (List.map (\i -> ( i.id, i )) newItems)
+                        ids =
+                            List.map (\i -> i.id) newItems
 
-                itemsUpdated =
-                    Dict.union newItemsDict model.items
-            in
-            noComand { model | stacks = Dict.update "SEARCH" (\_ -> Just (Stack "SEARCH" "New Stack" ids)) model.stacks, items = itemsUpdated }
+                        newItemsDict =
+                            Dict.fromList (List.map (\i -> ( i.id, i )) newItems)
+
+                        itemsUpdated =
+                            Dict.union newItemsDict model.items
+                    in
+                    noComand { model | stacks = Dict.update "SEARCH" (\_ -> Just (Stack "SEARCH" "New Stack" ids)) model.stacks, items = itemsUpdated }
+
+                _ ->
+                    noComand model
 
         ShowBoards ->
             noComand { model | sidebarState = Boards }
@@ -533,6 +555,20 @@ update msg model =
 
         Noop ->
             noComand model
+
+
+decodeItems : Json.Decoder SearchResponse
+decodeItems =
+    Json.map SearchResponse
+        (Json.field "items" (Json.list mapItem))
+
+
+mapItem : Json.Decoder Item
+mapItem =
+    Json.map3 Item
+        (Json.field "id" Json.string)
+        (Json.field "name" Json.string)
+        (Json.field "youtubeId" Json.string)
 
 
 createIds =
