@@ -1,12 +1,13 @@
 port module Login exposing (..)
 
+import Browser.Navigation as Nav
 import ExtraEvents exposing (classIf, onClickIf)
 import Html exposing (Attribute, Html, a, button, div, h3, img, input, span, text)
 import Html.Attributes exposing (autofocus, class, classList, disabled, href, placeholder, src, tabindex, type_, value)
 import Html.Events exposing (onInput)
 
 
-port login : Creds -> Cmd msg
+port googleSignin : () -> Cmd msg
 
 
 type alias Creds =
@@ -18,15 +19,15 @@ type alias Creds =
 type Msg
     = SetEmail String
     | SetPassword String
-    | OnLogin
-    | OnLoginSuccess LoginResponse
-    | OnLoginError LoginResponse
+    | OnLoginRequest
+    | OnLogin LoginSuccessResponse
+    | OnLogout String
 
 
-port onLoginSuccess : (LoginResponse -> msg) -> Sub msg
+port onLogin : (LoginSuccessResponse -> msg) -> Sub msg
 
 
-port onLoginError : (LoginResponse -> msg) -> Sub msg
+port onLogout : (String -> msg) -> Sub msg
 
 
 
@@ -37,7 +38,7 @@ init : Model
 init =
     { email = ""
     , password = ""
-    , loginStatus = Ready
+    , loginStatus = Anonymous
     }
 
 
@@ -49,13 +50,21 @@ type alias Model =
 
 
 type LoginStatus
-    = Ready
+    = Anonymous
+    | LoggedIn LoginSuccessResponse
     | Loading
     | LoginError
 
 
-type alias LoginResponse =
-    { foo : String
+type alias LoginSuccessResponse =
+    { displayName : String
+    , photoURL : String
+    , email : String
+    }
+
+
+type alias LoginErrorResponse =
+    { errorMessage : String
     }
 
 
@@ -63,8 +72,8 @@ type alias LoginResponse =
 --UPDATE
 
 
-update : Msg -> Model -> ( Model, Cmd msg )
-update msg model =
+update : Msg -> Model -> Nav.Key -> ( Model, Cmd msg )
+update msg model key =
     case msg of
         SetPassword password ->
             ( { model | password = password }, Cmd.none )
@@ -72,14 +81,14 @@ update msg model =
         SetEmail email ->
             ( { model | email = email }, Cmd.none )
 
-        OnLogin ->
-            ( { model | loginStatus = Loading }, login { email = model.email, password = model.password } )
+        OnLoginRequest ->
+            ( { model | loginStatus = Loading }, googleSignin () )
 
-        OnLoginSuccess res ->
-            ( { model | loginStatus = Ready }, Cmd.none )
+        OnLogin res ->
+            ( { model | loginStatus = LoggedIn res }, Nav.pushUrl key "/" )
 
-        OnLoginError res ->
-            ( { model | loginStatus = LoginError }, Cmd.none )
+        OnLogout res ->
+            ( { model | loginStatus = Anonymous }, Nav.pushUrl key "/login" )
 
 
 
@@ -98,9 +107,9 @@ viewLogin model =
             , h3 [] [ text "Log in to Lean Watch" ]
             , input [ type_ "email", tabindex 1, autofocus True, placeholder "Enter email", value model.email, onInput SetEmail ] []
             , input [ type_ "password", tabindex 2, placeholder "Enter password", value model.password, onInput SetPassword ] []
-            , button [ class "button flat", classIf isLoading "disabled", disabled isLoading, tabindex 3, onClickIf (not isLoading) OnLogin ] [ span [ classIf isLoading "spinner-border" ] [], text "Log In" ]
+            , button [ class "button flat", classIf isLoading "disabled", disabled isLoading, tabindex 3 ] [ span [ classIf isLoading "spinner-border" ] [], text "Log In" ]
             , div [ class "or-label" ] [ text "OR" ]
-            , button [ class "button material", tabindex 4 ] [ img [ class "google-icon", src "/icons/google.svg" ] [], text "Log in with Google" ]
+            , button [ class "button material", tabindex 4, classIf isLoading "disabled", onClickIf (not isLoading) OnLoginRequest ] [ img [ class "google-icon", src "/icons/google.svg" ] [], text "Log in with Google" ]
             , div [ class "line" ] []
             , div [] [ text "Private testing is taking place. We are sorry that you can't sign up yet" ]
             , div [] [ a [ href "mailto: static.ila@gmail.com" ] [ text "Ask us for an account thought ;)" ] ]

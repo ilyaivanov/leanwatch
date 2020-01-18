@@ -1,4 +1,4 @@
-module ExtraEvents exposing (MouseDownEvent, MouseMoveEvent, Offsets, classIf, onClickIf, onMouseDown, onMouseEnter, onMouseMove, onMouseUp)
+module ExtraEvents exposing (..)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -81,6 +81,15 @@ classIf condition className =
 
     else
         emptyAttribute
+
+
+attributesIf : Bool -> List (Attribute msg) -> List (Attribute msg)
+attributesIf condition attributes =
+    if condition then
+        attributes
+
+    else
+        []
 
 
 emptyAttribute =

@@ -216,11 +216,23 @@ body {
 /* TOP BAR */
 .top-bar {
   height: var(--top-bar-height);
-  padding: 4px;
+  display: flex;
+  justify-content: space-between;
 }
 
 button.active {
   background-color: lightblue;
+}
+
+.user-info-container{
+  display: flex;
+  align-items: center;
+}
+
+.user-info-image{
+  height: var(--top-bar-height);
+  border-radius: var(--top-bar-height);
+  margin-left: 10px;
 }
 
 /*LOGIN*/

@@ -1,4 +1,4 @@
-module Board exposing (..)
+port module Board exposing (..)
 
 import Dict exposing (Dict)
 import Embed.Youtube
@@ -7,7 +7,10 @@ import ExtraEvents exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
+import Http
+import Json.Decode as Json
 import List.Extra exposing (findIndex, splitAt)
+import Login
 import Process
 import Random
 import Task
@@ -18,6 +21,76 @@ noComand model =
     ( model, Cmd.none )
 
 
+port loadBoard : String -> Cmd msg
+
+
+port onUserProfileLoaded : (UserProfile -> msg) -> Sub msg
+
+
+port onBoardLoaded : (BoardResponse -> msg) -> Sub msg
+
+
+port saveBoard : BoardResponse -> Cmd msg
+
+
+
+-- NORMALIZATION to extract
+
+
+type alias BoardResponse =
+    { id : String
+    , name : String
+    , stacks :
+        List
+            { id : String
+            , name : String
+            , items :
+                List
+                    { id : String
+                    , name : String
+                    , youtubeId : String
+                    }
+            }
+    }
+
+
+mergeAndNormalizeResponse : BoardResponse -> Model -> Model
+mergeAndNormalizeResponse boardResponse model =
+    let
+        stacks =
+            Dict.fromList (List.map (\s -> ( s.id, Stack s.id s.name (getIds s.items) )) boardResponse.stacks)
+
+        allItems =
+            boardResponse.stacks |> List.map (\s -> s.items) |> List.concat
+
+        items =
+            Dict.fromList (List.map (\i -> ( i.id, { id = i.id, name = i.name, youtubeId = i.youtubeId } )) allItems)
+
+        getIds =
+            List.map (\s -> s.id)
+    in
+    { model
+        | boards = Dict.insert boardResponse.id (Board boardResponse.id boardResponse.name (getIds boardResponse.stacks)) model.boards
+        , stacks = Dict.union stacks model.stacks
+        , items = Dict.union items model.items
+    }
+
+
+denormalizeBoard : Board -> Model -> BoardResponse
+denormalizeBoard board model =
+    let
+        stacksNarrow =
+            board.stacks |> List.map (\id -> Dict.get id model.stacks) |> unpackMaybes
+
+        stacks =
+            stacksNarrow |> List.map (\s -> { id = s.id, name = s.name, items = s.items |> List.map (\id -> Dict.get id model.items) |> unpackMaybes })
+    in
+    { id = board.id
+    , name = board.name
+    , stacks = stacks
+    }
+
+
 
 -- MODEL
 
@@ -26,9 +99,8 @@ type alias Model =
     { boards : Dict String Board
     , stacks : Dict String Stack
     , items : Dict String Item
-    , boardsOrder : List String
-    , selectedBoard : String
     , videoBeingPlayed : Maybe String
+    , userProfile : UserProfile
 
     -- UI STATE
     , sidebarState : SidebarState
@@ -75,42 +147,35 @@ type Msg
     | OnSearchInput String
       -- Commands
     | CreateSingleId
-    | OnSearchDone String (List String)
       -- Debounced search
     | AttemptToSearch String
     | DebouncedSearch String String
+    | GotItems (Result Http.Error SearchResponse)
       -- Sidebar
     | HideSidebar
     | ShowSearch
     | ShowBoards
       -- Board Management
     | SelectBoard String
+    | UserProfileLoaded UserProfile
+    | BoardLoaded BoardResponse
+    | SaveSelectedBoard
 
 
 init : Model
 init =
-    { stacks =
-        Dict.fromList
-            [ ( "1", Stack "1" "My Stack 1" (createItems 1 5) )
-            , ( "2", Stack "2" "My Stack 42" (createItems 6 30) )
-            , ( "42", Stack "42" "My Stack 2" (createItems 31 35) )
-            , ( "Empty", Stack "Empty" "My Stack Empty" [] )
-            , ( "SEARCH", Stack "SEARCH" "SEARCH_STACK" (createItems 36 37) )
-            ]
-    , items = Dict.fromList (List.range 1 40 |> List.map String.fromInt |> List.map (\id -> ( id, { id = id, youtubeId = "WddpRmmAYkg", name = "Item NEW LOng long long very long text indeeo" ++ id } )))
+    { stacks = Dict.empty
+    , items = Dict.empty
+    , boards = Dict.empty
+    , userProfile =
+        { selectedBoard = ""
+        , boards = []
+        }
     , dragState = NoDrag
     , searchTerm = ""
     , currentSearchId = ""
     , videoBeingPlayed = Nothing
     , sidebarState = Boards
-    , boards =
-        Dict.fromList
-            [ ( "BOARD1", { id = "BOARD1", name = "My Board", stacks = [ "1", "2" ] } )
-            , ( "BOARD2", { id = "BOARD2", name = "My Second Board", stacks = [ "42", "Empty" ] } )
-            , ( "BOARD3", { id = "BOARD3", name = "My Third Board", stacks = [] } )
-            ]
-    , selectedBoard = "BOARD1"
-    , boardsOrder = [ "BOARD3", "BOARD2", "BOARD1" ]
     }
 
 
@@ -121,6 +186,16 @@ type alias Stack =
     }
 
 
+type alias UserProfile =
+    { boards : List BoardInfo
+    , selectedBoard : String
+    }
+
+
+type alias BoardInfo =
+    { id : String, name : String }
+
+
 type alias Item =
     { id : String
     , name : String
@@ -128,9 +203,9 @@ type alias Item =
     }
 
 
-createItems : Int -> Int -> List String
-createItems from to =
-    List.map (\n -> String.fromInt n) (List.range from to)
+type alias SearchResponse =
+    { items : List Item
+    }
 
 
 isDraggingStack : DragState -> String -> Bool
@@ -148,16 +223,6 @@ isDraggingItem dragState { id } =
     case dragState of
         DraggingItem _ _ itemBeingDragged ->
             itemBeingDragged == id
-
-        _ ->
-            False
-
-
-isDraggingAnyItem : DragState -> Bool
-isDraggingAnyItem dragState =
-    case dragState of
-        DraggingItem _ _ _ ->
-            True
 
         _ ->
             False
@@ -254,16 +319,9 @@ isHidden state =
             False
 
 
-getBoardsInOrder : Model -> List Board
-getBoardsInOrder model =
-    model.boardsOrder
-        |> List.map (\boardId -> Dict.get boardId model.boards)
-        |> unpackMaybes
-
-
-getBoardViewModel : Model -> Board
+getBoardViewModel : Model -> Maybe Board
 getBoardViewModel model =
-    Dict.get model.selectedBoard model.boards |> Maybe.withDefault { id = "", name = "NNOT_FOUND", stacks = [] }
+    Dict.get model.userProfile.selectedBoard model.boards
 
 
 
@@ -400,7 +458,7 @@ update msg model =
         CreateStack newStackId ->
             noComand
                 { model
-                    | boards = updateBoard model.selectedBoard (\b -> { b | stacks = List.append b.stacks [ newStackId ] }) model.boards
+                    | boards = updateBoard model.userProfile.selectedBoard (\b -> { b | stacks = List.append b.stacks [ newStackId ] }) model.boards
                     , stacks = Dict.insert newStackId (Stack newStackId "New Stack" []) model.stacks
                 }
 
@@ -416,24 +474,39 @@ update msg model =
             ( { model | currentSearchId = searchId }, Process.sleep 500 |> Task.perform (always (DebouncedSearch searchId model.searchTerm)) )
 
         DebouncedSearch id term ->
+            let
+                request =
+                    Http.get
+                        { url = "https://us-central1-lean-watch.cloudfunctions.net/getVideos?q=" ++ term
+                        , expect = Http.expectJson GotItems decodeItems
+                        }
+            in
             if id == model.currentSearchId then
-                ( { model | currentSearchId = "" }, Random.generate (OnSearchDone term) createIds )
+                ( { model | currentSearchId = "" }, request )
 
             else
                 ( model, Cmd.none )
 
-        OnSearchDone postfix ids ->
-            let
-                newItems =
-                    ids |> List.map (\id -> Item id ("ITEM " ++ postfix ++ String.slice 2 3 id) "b5SSHK-mIF8")
+        GotItems response ->
+            case response of
+                Ok body ->
+                    let
+                        newItems =
+                            body.items
 
-                newItemsDict =
-                    Dict.fromList (List.map (\i -> ( i.id, i )) newItems)
+                        ids =
+                            List.map (\i -> i.id) newItems
 
-                itemsUpdated =
-                    Dict.union newItemsDict model.items
-            in
-            noComand { model | stacks = Dict.update "SEARCH" (\_ -> Just (Stack "SEARCH" "New Stack" ids)) model.stacks, items = itemsUpdated }
+                        newItemsDict =
+                            Dict.fromList (List.map (\i -> ( i.id, i )) newItems)
+
+                        itemsUpdated =
+                            Dict.union newItemsDict model.items
+                    in
+                    noComand { model | stacks = Dict.update "SEARCH" (\_ -> Just (Stack "SEARCH" "New Stack" ids)) model.stacks, items = itemsUpdated }
+
+                _ ->
+                    noComand model
 
         ShowBoards ->
             noComand { model | sidebarState = Boards }
@@ -445,10 +518,57 @@ update msg model =
             noComand { model | sidebarState = Hidden }
 
         SelectBoard boardId ->
-            noComand { model | selectedBoard = boardId }
+            if boardId == model.userProfile.selectedBoard then
+                ( model, Cmd.none )
+
+            else
+                let
+                    profile =
+                        model.userProfile
+
+                    selectedBoard =
+                        Dict.get boardId model.boards
+
+                    action =
+                        case selectedBoard of
+                            Just _ ->
+                                Cmd.none
+
+                            Nothing ->
+                                loadBoard boardId
+                in
+                ( { model | userProfile = { profile | selectedBoard = boardId } }, action )
+
+        UserProfileLoaded profile ->
+            ( { model | userProfile = profile }, loadBoard profile.selectedBoard )
+
+        BoardLoaded board ->
+            noComand (mergeAndNormalizeResponse board model)
+
+        SaveSelectedBoard ->
+            case Dict.get model.userProfile.selectedBoard model.boards of
+                Just actualBoard ->
+                    ( model, saveBoard (denormalizeBoard actualBoard model) )
+
+                Nothing ->
+                    noComand model
 
         Noop ->
             noComand model
+
+
+decodeItems : Json.Decoder SearchResponse
+decodeItems =
+    Json.map SearchResponse
+        (Json.field "items" (Json.list mapItem))
+
+
+mapItem : Json.Decoder Item
+mapItem =
+    Json.map3 Item
+        (Json.field "id" Json.string)
+        (Json.field "name" Json.string)
+        (Json.field "youtubeId" Json.string)
 
 
 createIds =
@@ -468,14 +588,14 @@ moveStackToAnotherPosition : Model -> String -> String -> Dict String Board
 moveStackToAnotherPosition model stackOver stackUnder =
     let
         board =
-            Dict.get model.selectedBoard model.boards |> Maybe.withDefault { id = "", name = "", stacks = [] }
+            Dict.get model.userProfile.selectedBoard model.boards |> Maybe.withDefault { id = "", name = "", stacks = [] }
 
         targetIndex =
             findIndex (equals stackUnder) board.stacks |> Maybe.withDefault -1
     in
     model.boards
-        |> updateBoard model.selectedBoard (\s -> { s | stacks = removeItem stackOver s.stacks })
-        |> updateBoard model.selectedBoard (\s -> { s | stacks = insertInto targetIndex stackOver s.stacks })
+        |> updateBoard model.userProfile.selectedBoard (\s -> { s | stacks = removeItem stackOver s.stacks })
+        |> updateBoard model.userProfile.selectedBoard (\s -> { s | stacks = insertInto targetIndex stackOver s.stacks })
 
 
 updateStack : String -> (Stack -> Stack) -> Dict String Stack -> Dict String Stack
@@ -524,45 +644,69 @@ notEquals a b =
 -- VIEW
 
 
-view : Model -> Html Msg
-view model =
-    div (attributesIf (shouldListenToMoveEvents model.dragState) [ onMouseMove MouseMove, onMouseUp MouseUp ])
-        [ viewTopBar model
-        , div []
-            [ viewSidebar model
-            , viewBoard (getBoardViewModel model) model
-            ]
-        , viewPlayer model
-        ]
+view : Model -> Maybe Login.LoginSuccessResponse -> Html Msg
+view model login =
+    case model.userProfile.selectedBoard of
+        -- ugly assumption, but works for now. Consider using a separate precise state of loading
+        -- maybe even load your state progressively
+        "" ->
+            div [] [ text "Loading user profile..." ]
+
+        _ ->
+            div (attributesIf (shouldListenToMoveEvents model.dragState) [ onMouseMove MouseMove, onMouseUp MouseUp ])
+                [ viewTopBar model login
+                , div []
+                    [ viewSidebar model
+                    , viewBoard model
+                    ]
+                , viewPlayer model
+                ]
 
 
-viewTopBar : Model -> Html Msg
-viewTopBar model =
+viewTopBar : Model -> Maybe Login.LoginSuccessResponse -> Html Msg
+viewTopBar model login =
     div [ class "top-bar" ]
-        [ button [ classIf (isBoards model.sidebarState) "active", onClick ShowBoards ] [ text "boards" ]
-        , button [ classIf (isSearch model.sidebarState) "active", onClick ShowSearch ] [ text "search" ]
+        [ div []
+            [ button [ classIf (isBoards model.sidebarState) "active", onClick ShowBoards ] [ text "boards" ]
+            , button [ classIf (isSearch model.sidebarState) "active", onClick ShowSearch ] [ text "search" ]
+            ]
+        , Maybe.map viewUser login |> Maybe.withDefault (div [] [])
         ]
 
 
-viewBoard : Board -> Model -> Html Msg
-viewBoard board model =
-    div
-        [ class "board"
-        , classIf (not (isHidden model.sidebarState)) "board-with-sidebar"
-        , classIf (isDraggingAnything model.dragState) "board-during-drag"
+viewUser : Login.LoginSuccessResponse -> Html Msg
+viewUser loginInfo =
+    div [ class "user-info-container" ]
+        [ button [ onClick SaveSelectedBoard ] [ text "save" ]
+        , span [] [ text loginInfo.displayName ]
+        , img [ class "user-info-image", src loginInfo.photoURL ] []
         ]
-        [ viewBoardBar board
-        , div
-            [ class "columns-container" ]
-            (List.append
-                (board.stacks
-                    |> List.map (\stackId -> Dict.get stackId model.stacks)
-                    |> unpackMaybes
-                    |> List.map (\stack -> viewStack model.dragState [ class "column-board" ] (getStackToView model stack.id))
-                )
-                [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ], viewElementBeingDragged model ]
-            )
-        ]
+
+
+viewBoard : Model -> Html Msg
+viewBoard model =
+    case getBoardViewModel model of
+        Just board ->
+            div
+                [ class "board"
+                , classIf (not (isHidden model.sidebarState)) "board-with-sidebar"
+                , classIf (isDraggingAnything model.dragState) "board-during-drag"
+                ]
+                [ viewBoardBar board
+                , div
+                    [ class "columns-container" ]
+                    (List.append
+                        (board.stacks
+                            |> List.map (\stackId -> Dict.get stackId model.stacks)
+                            |> unpackMaybes
+                            |> List.map (\stack -> viewStack model.dragState [ class "column-board" ] (getStackToView model stack.id))
+                        )
+                        [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ], viewElementBeingDragged model ]
+                    )
+                ]
+
+        Nothing ->
+            div [] [ text "Loading BOARD" ]
 
 
 viewBoardBar : Board -> Html Msg
@@ -632,12 +776,12 @@ viewBoards model =
         [ h3 [] [ text "Boards" ]
         , button [ onClick HideSidebar ] [ text "<" ]
         ]
-    , div [] (getBoardsInOrder model |> List.map (viewBoardButton model))
+    , div [] (model.userProfile.boards |> List.map (viewBoardButton model))
     ]
 
 
 viewBoardButton model { name, id } =
-    div [ class "sidebar-boards-button", classIf (model.selectedBoard == id) "active", onClick (SelectBoard id) ] [ text name ]
+    div [ class "sidebar-boards-button", classIf (model.userProfile.selectedBoard == id) "active", onClick (SelectBoard id) ] [ text name ]
 
 
 viewItem : List (Attribute Msg) -> Bool -> Item -> Html Msg
@@ -708,25 +852,3 @@ viewPlayer model =
 
         Nothing ->
             div [] []
-
-
-
--- CSS HELPERS
-
-
-classIf : Bool -> String -> Attribute msg
-classIf condition className =
-    if condition then
-        class className
-
-    else
-        class ""
-
-
-attributesIf : Bool -> List (Attribute msg) -> List (Attribute msg)
-attributesIf condition attributes =
-    if condition then
-        attributes
-
-    else
-        []

@@ -3,6 +3,7 @@ module Main exposing (main)
 import Board as Board
 import Browser exposing (Document)
 import Browser.Navigation as Nav
+import Dict exposing (Dict)
 import Html exposing (Attribute, Html, div, text)
 import Login as Login
 import Url exposing (Url)
@@ -22,7 +23,7 @@ main =
 
 
 
--- MODEL
+--MODEL
 
 
 type alias Model =
@@ -51,6 +52,10 @@ type Msg
     | BoardMsg Board.Msg
 
 
+
+--| BoardsLoaded BoardsResponse
+
+
 type Page
     = Login
     | Boards
@@ -65,17 +70,8 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         LoginMsg loginMsg ->
-            case loginMsg of
-                Login.OnLoginSuccess res ->
-                    let
-                        nextLoginModel =
-                            Login.update (Login.OnLoginSuccess res) model.login |> Tuple.first
-                    in
-                    ( { model | login = nextLoginModel }, Nav.pushUrl model.key "/" )
-
-                _ ->
-                    Login.update loginMsg model.login
-                        |> (\( login, cmd ) -> ( { model | login = login }, cmd ))
+            Login.update loginMsg model.login model.key
+                |> (\( login, cmd ) -> ( { model | login = login }, cmd ))
 
         BoardMsg boardMsg ->
             Board.update boardMsg model.board
@@ -96,10 +92,11 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Login.onLoginSuccess Login.OnLoginSuccess
-        , Login.onLoginError Login.OnLoginError
+        [ Login.onLogin Login.OnLogin |> Sub.map LoginMsg
+        , Login.onLogout Login.OnLogout |> Sub.map LoginMsg
+        , Board.onUserProfileLoaded Board.UserProfileLoaded |> Sub.map BoardMsg
+        , Board.onBoardLoaded Board.BoardLoaded |> Sub.map BoardMsg
         ]
-        |> Sub.map LoginMsg
 
 
 parser : Parser (Page -> a) a
@@ -138,7 +135,16 @@ viewPage model =
             Login.viewLogin model.login |> Html.map LoginMsg
 
         Boards ->
-            Board.view model.board |> Html.map BoardMsg
+            let
+                loginStatus =
+                    case model.login.loginStatus of
+                        Login.LoggedIn status ->
+                            Just status
+
+                        _ ->
+                            Nothing
+            in
+            Board.view model.board loginStatus |> Html.map BoardMsg
 
         NotFound ->
             text "NotFound"
