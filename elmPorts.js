@@ -19,6 +19,13 @@ function registerPorts(ports) {
       ports.onBoardLoaded.send({...snapshot.data(), id: snapshot.id});
     });
   });
+
+  ports.saveBoard.subscribe(function (board) {
+    console.log('saving board', board);
+    firestore.collection('boards').doc(board.id).set(board).then(snapshot => {
+      console.log('Board ' + board.name + " have been saved");
+    });
+  });
 }
 
 function handleUserLogin(user, onSuccess) {

@@ -28,6 +28,9 @@ port onUserProfileLoaded : (UserProfile -> msg) -> Sub msg
 port onBoardLoaded : (BoardResponse -> msg) -> Sub msg
 
 
+port saveBoard : BoardResponse -> Cmd msg
+
+
 
 -- NORMALIZATION to extract
 
@@ -68,6 +71,21 @@ mergeAndNormalizeResponse boardResponse model =
         | boards = Dict.insert boardResponse.id (Board boardResponse.id boardResponse.name (getIds boardResponse.stacks)) model.boards
         , stacks = Dict.union stacks model.stacks
         , items = Dict.union items model.items
+    }
+
+
+denormalizeBoard : Board -> Model -> BoardResponse
+denormalizeBoard board model =
+    let
+        stacksNarrow =
+            board.stacks |> List.map (\id -> Dict.get id model.stacks) |> unpackMaybes
+
+        stacks =
+            stacksNarrow |> List.map (\s -> { id = s.id, name = s.name, items = s.items |> List.map (\id -> Dict.get id model.items) |> unpackMaybes })
+    in
+    { id = board.id
+    , name = board.name
+    , stacks = stacks
     }
 
 
@@ -139,6 +157,7 @@ type Msg
     | SelectBoard String
     | UserProfileLoaded UserProfile
     | BoardLoaded BoardResponse
+    | SaveSelectedBoard
 
 
 init : Model
@@ -504,6 +523,14 @@ update msg model =
         BoardLoaded board ->
             noComand (mergeAndNormalizeResponse board model)
 
+        SaveSelectedBoard ->
+            case Dict.get model.userProfile.selectedBoard model.boards of
+                Just actualBoard ->
+                    ( model, saveBoard (denormalizeBoard actualBoard model) )
+
+                Nothing ->
+                    noComand model
+
         Noop ->
             noComand model
 
@@ -614,7 +641,8 @@ viewTopBar model login =
 viewUser : Login.LoginSuccessResponse -> Html Msg
 viewUser loginInfo =
     div [ class "user-info-container" ]
-        [ span [] [ text loginInfo.displayName ]
+        [ button [ onClick SaveSelectedBoard ] [ text "save" ]
+        , span [] [ text loginInfo.displayName ]
         , img [ class "user-info-image", src loginInfo.photoURL ] []
         ]
 
