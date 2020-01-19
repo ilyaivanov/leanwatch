@@ -235,16 +235,6 @@ isDraggingAnything dragState =
             True
 
 
-shouldListenToMoveEvents : DragState -> Bool
-shouldListenToMoveEvents dragState =
-    case dragState of
-        NoDrag ->
-            False
-
-        _ ->
-            True
-
-
 getSearchStack : Model -> Maybe Stack
 getSearchStack model =
     model.stacks |> Dict.get "SEARCH"
@@ -281,26 +271,6 @@ getItemById itemId model =
 getStack : String -> Dict String Stack -> Stack
 getStack stackId stacks =
     Dict.get stackId stacks |> Maybe.withDefault (Stack "NOT_FOUND" "NOT_FOUND" [])
-
-
-isBoards : SidebarState -> Bool
-isBoards state =
-    case state of
-        Boards ->
-            True
-
-        _ ->
-            False
-
-
-isSearch : SidebarState -> Bool
-isSearch state =
-    case state of
-        Search ->
-            True
-
-        _ ->
-            False
 
 
 getBoardViewModel : Model -> Maybe Board
@@ -626,7 +596,7 @@ view model login =
             div [] [ text "Loading user profile..." ]
 
         _ ->
-            div (attributesIf (shouldListenToMoveEvents model.dragState) [ onMouseMove MouseMove, onMouseUp MouseUp ])
+            div (attributesIf (model.dragState /= NoDrag) [ onMouseMove MouseMove, onMouseUp MouseUp ])
                 [ viewTopBar model login
                 , div []
                     [ viewSidebar model
@@ -640,8 +610,8 @@ viewTopBar : Model -> Maybe Login.LoginSuccessResponse -> Html Msg
 viewTopBar model login =
     div [ class "top-bar" ]
         [ div []
-            [ button [ classIf (isBoards model.sidebarState) "active", onClick ShowBoards ] [ text "boards" ]
-            , button [ classIf (isSearch model.sidebarState) "active", onClick ShowSearch ] [ text "search" ]
+            [ button [ classIf (model.sidebarState == Boards) "active", onClick ShowBoards ] [ text "boards" ]
+            , button [ classIf (model.sidebarState == Search) "active", onClick ShowSearch ] [ text "search" ]
             ]
         , Maybe.map viewUser login |> Maybe.withDefault (div [] [])
         ]
