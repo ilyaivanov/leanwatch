@@ -7,21 +7,19 @@ function registerPorts(ports) {
   auth.onAuthStateChanged(function (user) {
     if (user) {
       ports.onLogin.send(user);
-      handleUserLogin(user, userProfile => ports.onUserProfileLoaded.send(userProfile));
+      handleUserLogin(user, userProfile => {
+        ports.onUserProfileLoaded.send(userProfile);
+        firestore.collection('boards').where('id', 'in', userProfile.boards).get().then(snapshot => {
+          ports.onBoardsLoaded.send(snapshot.docs.map(d => d.data()));
+        });
+      });
     } else
       ports.onLogout.send("ignored value");
   });
 
   ports.googleSignin.subscribe(() => auth.signInWithPopup(provider));
 
-  ports.loadBoard.subscribe(function (boardId) {
-    firestore.collection('boards').doc(boardId).get().then(snapshot => {
-      ports.onBoardLoaded.send({...snapshot.data(), id: snapshot.id});
-    });
-  });
-
   ports.saveBoard.subscribe(function (board) {
-    console.log('saving board', board);
     firestore.collection('boards').doc(board.id).set(board).then(snapshot => {
       console.log('Board ' + board.name + " have been saved");
     });
@@ -35,9 +33,9 @@ function handleUserLogin(user, onSuccess) {
       onSuccess({id: snapshot.id, ...snapshot.data()});
     } else {
       const newBoard = firestore.collection('boards').doc();
-      newBoard.set(defaultBoard);
+      newBoard.set({...defaultBoard, id: newBoard.id});
       const newProfile = {
-        boards: [{id: newBoard.id, name: defaultBoard.name}],
+        boards: [newBoard.id],
         selectedBoard: newBoard.id,
       };
       userRef.set(newProfile);
@@ -46,7 +44,8 @@ function handleUserLogin(user, onSuccess) {
   });
 }
 
-
+// TODO: move default boards to the backend
+// So that you can assign unique ids during creation
 const defaultBoard = {
   name: "First Board",
   stacks: [

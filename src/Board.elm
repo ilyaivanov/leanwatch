@@ -14,6 +14,7 @@ import Login
 import Process
 import Random
 import Task
+import Utils exposing (flip)
 
 
 noComand : Model -> ( Model, Cmd msg )
@@ -21,13 +22,10 @@ noComand model =
     ( model, Cmd.none )
 
 
-port loadBoard : String -> Cmd msg
-
-
 port onUserProfileLoaded : (UserProfile -> msg) -> Sub msg
 
 
-port onBoardLoaded : (BoardResponse -> msg) -> Sub msg
+port onBoardsLoaded : (List BoardResponse -> msg) -> Sub msg
 
 
 port saveBoard : BoardResponse -> Cmd msg
@@ -158,7 +156,7 @@ type Msg
       -- Board Management
     | SelectBoard String
     | UserProfileLoaded UserProfile
-    | BoardLoaded BoardResponse
+    | BoardsLoaded (List BoardResponse)
     | SaveSelectedBoard
 
 
@@ -187,13 +185,9 @@ type alias Stack =
 
 
 type alias UserProfile =
-    { boards : List BoardInfo
+    { boards : List String
     , selectedBoard : String
     }
-
-
-type alias BoardInfo =
-    { id : String, name : String }
 
 
 type alias Item =
@@ -303,16 +297,6 @@ isSearch : SidebarState -> Bool
 isSearch state =
     case state of
         Search ->
-            True
-
-        _ ->
-            False
-
-
-isHidden : SidebarState -> Bool
-isHidden state =
-    case state of
-        Hidden ->
             True
 
         _ ->
@@ -525,25 +509,14 @@ update msg model =
                 let
                     profile =
                         model.userProfile
-
-                    selectedBoard =
-                        Dict.get boardId model.boards
-
-                    action =
-                        case selectedBoard of
-                            Just _ ->
-                                Cmd.none
-
-                            Nothing ->
-                                loadBoard boardId
                 in
-                ( { model | userProfile = { profile | selectedBoard = boardId } }, action )
+                ( { model | userProfile = { profile | selectedBoard = boardId } }, Cmd.none )
 
         UserProfileLoaded profile ->
-            ( { model | userProfile = profile }, loadBoard profile.selectedBoard )
+            ( { model | userProfile = profile }, Cmd.none )
 
-        BoardLoaded board ->
-            noComand (mergeAndNormalizeResponse board model)
+        BoardsLoaded boards ->
+            noComand (List.foldl mergeAndNormalizeResponse model boards)
 
         SaveSelectedBoard ->
             case Dict.get model.userProfile.selectedBoard model.boards of
@@ -689,7 +662,7 @@ viewBoard model =
         Just board ->
             div
                 [ class "board"
-                , classIf (not (isHidden model.sidebarState)) "board-with-sidebar"
+                , classIf (model.sidebarState /= Hidden) "board-with-sidebar"
                 , classIf (isDraggingAnything model.dragState) "board-during-drag"
                 ]
                 [ viewBoardBar board
@@ -776,7 +749,7 @@ viewBoards model =
         [ h3 [] [ text "Boards" ]
         , button [ onClick HideSidebar ] [ text "<" ]
         ]
-    , div [] (model.userProfile.boards |> List.map (viewBoardButton model))
+    , div [] (model.userProfile.boards |> List.map (flip Dict.get model.boards) |> unpackMaybes |> List.map (viewBoardButton model))
     , div [] [ button [] [ text "Add" ] ]
     ]
 

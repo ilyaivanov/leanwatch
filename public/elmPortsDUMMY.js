@@ -8,29 +8,25 @@ function registerPorts(ports) {
     });
     ports.onUserProfileLoaded.send({
       selectedBoard: "BOARD_1",
-      boards: [
-        {id: 'BOARD_1', name: "First Board"},
-        {id: 'BOARD_2', name: "Second Board"},
-        {id: 'BOARD_3', name: "Third Board"},
-
-      ],
+      boards: ['BOARD_1', 'BOARD_2', 'BOARD_3'],
     });
-  }, 200);
 
-  ports.loadBoard.subscribe(function (boardId) {
-    ports.onBoardLoaded.send(boards[boardId]);
-  });
+    setTimeout(() => {
+      ports.onBoardsLoaded.send(boards);
+    }, 200)
+  }, 200);
 
   ports.saveBoard.subscribe(function (board) {
     console.log('saving board', board);
   });
 }
 
-const boards = {
-  "BOARD_1": {...createDummyBoard()},
-  "BOARD_2": {...createDummyBoard(), id: "BOARD_2", name:"Second Board"},
-  "BOARD_3": {...createDummyBoard(), id: "BOARD_3", name:"Third Board"},
-};
+const boards = [
+  {...createDummyBoard()},
+  {...createDummyBoard(), id: "BOARD_2", name: "Second Board"},
+  {...createDummyBoard(), id: "BOARD_3", name: "Third Board"},
+];
+
 
 function createDummyBoard() {
   return {
