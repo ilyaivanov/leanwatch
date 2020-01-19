@@ -1,6 +1,7 @@
-port module Board exposing (Model, Msg(..), init, onBoardsLoaded, onUserProfileLoaded, update, view)
+port module Board exposing (Item, Model, Msg(..), Stack, init, onBoardsLoaded, onUserProfileLoaded, update, view)
 
 import Dict exposing (Dict)
+import DictMoves exposing (Parent, moveItem, moveItemToEndOfStack)
 import Embed.Youtube
 import Embed.Youtube.Attributes
 import ExtraEvents exposing (..)
@@ -56,7 +57,7 @@ mergeAndNormalizeResponse : BoardResponse -> Model -> Model
 mergeAndNormalizeResponse boardResponse model =
     let
         stacks =
-            Dict.fromList (List.map (\s -> ( s.id, Stack s.id s.name (getIds s.items) )) boardResponse.stacks)
+            Dict.fromList (List.map (\s -> ( s.id, { id = s.id, name = s.name, items = getIds s.items } )) boardResponse.stacks)
 
         allItems =
             boardResponse.stacks |> List.map (\s -> s.items) |> List.concat
@@ -178,10 +179,9 @@ init =
 
 
 type alias Stack =
-    { id : String
-    , name : String
-    , items : List String
-    }
+    Parent
+        { name : String
+        }
 
 
 type alias UserProfile =
@@ -257,7 +257,7 @@ getStackByItem item stacks =
         |> List.filter (\( _, stack ) -> List.member item stack.items)
         |> List.map Tuple.second
         |> List.head
-        |> Maybe.withDefault (Stack "NOT_FOUND" "NOT_FOUND" [])
+        |> Maybe.withDefault { id = "NOT_FOUND", name = "NOT_FOUND", items = [] }
 
 
 getItemById : String -> Model -> Maybe Item
@@ -270,7 +270,7 @@ getItemById itemId model =
 
 getStack : String -> Dict String Stack -> Stack
 getStack stackId stacks =
-    Dict.get stackId stacks |> Maybe.withDefault (Stack "NOT_FOUND" "NOT_FOUND" [])
+    Dict.get stackId stacks |> Maybe.withDefault { id = "NOT_FOUND", name = "NOT_FOUND", items = [] }
 
 
 getBoardViewModel : Model -> Maybe Board
@@ -324,31 +324,7 @@ update msg model =
                         noComand model
 
                     else
-                        let
-                            fromStack =
-                                getStackByItem itemOver model.stacks
-
-                            toStack =
-                                getStackByItem itemUnder model.stacks
-
-                            fromStackId =
-                                fromStack.id
-
-                            toStackId =
-                                toStack.id
-
-                            toStackItems =
-                                toStack.items
-
-                            targetIndex =
-                                findIndex (equals itemUnder) toStackItems |> Maybe.withDefault -1
-
-                            newStacks =
-                                model.stacks
-                                    |> updateStack fromStackId (\s -> { s | items = removeItem itemOver s.items })
-                                    |> updateStack toStackId (\s -> { s | items = insertAtIndex targetIndex itemOver s.items })
-                        in
-                        noComand { model | stacks = newStacks }
+                        noComand { model | stacks = moveItem model.stacks { from = itemOver, to = itemUnder } }
 
                 _ ->
                     noComand model
@@ -367,44 +343,7 @@ update msg model =
                     noComand { model | boards = moveStackToAnotherPosition model stackOver stackUnder }
 
                 DraggingItem _ _ itemOver ->
-                    let
-                        fromStack =
-                            getStackByItem itemOver model.stacks
-
-                        toStack =
-                            getStack stackUnder model.stacks
-
-                        fromStackId =
-                            fromStack.id
-
-                        toStackId =
-                            toStack.id
-
-                        toItems =
-                            toStack.items
-                    in
-                    case findLastItem toItems of
-                        Just lastItem ->
-                            if lastItem == itemOver then
-                                noComand model
-
-                            else
-                                noComand
-                                    { model
-                                        | stacks =
-                                            model.stacks
-                                                |> updateStack fromStackId (\s -> { s | items = removeItem itemOver s.items })
-                                                |> updateStack toStackId (\s -> { s | items = List.append s.items [ itemOver ] })
-                                    }
-
-                        Nothing ->
-                            noComand
-                                { model
-                                    | stacks =
-                                        model.stacks
-                                            |> updateStack fromStackId (\s -> { s | items = removeItem itemOver s.items })
-                                            |> updateStack toStackId (\s -> { s | items = [ itemOver ] })
-                                }
+                    noComand { model | stacks = moveItemToEndOfStack model.stacks { itemToMove = itemOver, targetStack = stackUnder } }
 
                 _ ->
                     noComand model
@@ -413,7 +352,7 @@ update msg model =
             noComand
                 { model
                     | boards = updateBoard model.userProfile.selectedBoard (\b -> { b | stacks = List.append b.stacks [ newStackId ] }) model.boards
-                    , stacks = Dict.insert newStackId (Stack newStackId "New Stack" []) model.stacks
+                    , stacks = Dict.insert newStackId { id = newStackId, name = "New Stack", items = [] } model.stacks
                 }
 
         OnSearchInput val ->
@@ -457,7 +396,7 @@ update msg model =
                         itemsUpdated =
                             Dict.union newItemsDict model.items
                     in
-                    noComand { model | stacks = Dict.update "SEARCH" (\_ -> Just (Stack "SEARCH" "New Stack" ids)) model.stacks, items = itemsUpdated }
+                    noComand { model | stacks = Dict.update "SEARCH" (\_ -> Just { id = "SEARCH", name = "New Stack", items = ids }) model.stacks, items = itemsUpdated }
 
                 _ ->
                     noComand model
