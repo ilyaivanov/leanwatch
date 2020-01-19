@@ -14,7 +14,7 @@ import Login
 import Process
 import Random
 import Task
-import Utils exposing (..)
+import Utils exposing (flipArguments, ignoreNothing)
 
 
 noComand : Model -> ( Model, Cmd msg )
@@ -78,10 +78,10 @@ denormalizeBoard : Board -> Model -> BoardResponse
 denormalizeBoard board model =
     let
         stacksNarrow =
-            board.children |> List.map (\id -> Dict.get id model.stacks) |> unpackMaybes
+            board.children |> List.map (\id -> Dict.get id model.stacks) |> ignoreNothing
 
         stacks =
-            stacksNarrow |> List.map (\s -> { id = s.id, name = s.name, items = s.children |> List.map (\id -> Dict.get id model.items) |> unpackMaybes })
+            stacksNarrow |> List.map (\s -> { id = s.id, name = s.name, items = s.children |> List.map (\id -> Dict.get id model.items) |> ignoreNothing })
     in
     { id = board.id
     , name = board.name
@@ -143,9 +143,7 @@ type Msg
     | DebouncedSearch String String
     | GotItems (Result Http.Error SearchResponse)
       -- Sidebar
-    | HideSidebar
-    | ShowSearch
-    | ShowBoards
+    | SetSidebar SidebarState
       -- Board Management
     | SelectBoard String
     | UserProfileLoaded UserProfile
@@ -244,7 +242,7 @@ getStackToView model stackId =
             getStack stackId model.stacks
 
         items =
-            stack.children |> List.map (\itemId -> Dict.get itemId model.items) |> unpackMaybes
+            stack.children |> List.map (\itemId -> Dict.get itemId model.items) |> ignoreNothing
     in
     ( stack, items )
 
@@ -387,14 +385,8 @@ update msg model =
                 _ ->
                     noComand model
 
-        ShowBoards ->
-            noComand { model | sidebarState = Boards }
-
-        ShowSearch ->
-            noComand { model | sidebarState = Search }
-
-        HideSidebar ->
-            noComand { model | sidebarState = Hidden }
+        SetSidebar state ->
+            noComand { model | sidebarState = state }
 
         SelectBoard boardId ->
             if boardId == model.userProfile.selectedBoard then
@@ -475,8 +467,8 @@ viewTopBar : Model -> Maybe Login.LoginSuccessResponse -> Html Msg
 viewTopBar model login =
     div [ class "top-bar" ]
         [ div []
-            [ button [ classIf (model.sidebarState == Boards) "active", onClick ShowBoards ] [ text "boards" ]
-            , button [ classIf (model.sidebarState == Search) "active", onClick ShowSearch ] [ text "search" ]
+            [ button [ classIf (model.sidebarState == Boards) "active", onClick (SetSidebar Boards) ] [ text "boards" ]
+            , button [ classIf (model.sidebarState == Search) "active", onClick (SetSidebar Search) ] [ text "search" ]
             ]
         , Maybe.map viewUser login |> Maybe.withDefault (div [] [])
         ]
@@ -506,7 +498,7 @@ viewBoard model =
                     (List.append
                         (board.children
                             |> List.map (\stackId -> Dict.get stackId model.stacks)
-                            |> unpackMaybes
+                            |> ignoreNothing
                             |> List.map (\stack -> viewStack model.dragState [ class "column-board" ] (getStackToView model stack.id))
                         )
                         [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ], viewElementBeingDragged model ]
@@ -568,12 +560,12 @@ viewSearch model =
         items =
             case stackM of
                 Just stack ->
-                    stack.children |> List.map (\itemId -> Dict.get itemId model.items) |> unpackMaybes
+                    stack.children |> List.map (\itemId -> Dict.get itemId model.items) |> ignoreNothing
 
                 Nothing ->
                     []
     in
-    [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick HideSidebar ] [ text "<" ] ]
+    [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick (SetSidebar Hidden) ] [ text "<" ] ]
     , input [ onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
     , div [] (List.map (\item -> viewItem [] (isDraggingItem model.dragState item) item) items)
     ]
@@ -582,9 +574,9 @@ viewSearch model =
 viewBoards model =
     [ div [ class "sidebar-header sidebar-padded" ]
         [ h3 [] [ text "Boards" ]
-        , button [ onClick HideSidebar ] [ text "<" ]
+        , button [ onClick (SetSidebar Hidden) ] [ text "<" ]
         ]
-    , div [] (model.userProfile.boards |> List.map (flip Dict.get model.boards) |> unpackMaybes |> List.map (viewBoardButton model))
+    , div [] (model.userProfile.boards |> List.map (flipArguments Dict.get model.boards) |> ignoreNothing |> List.map (viewBoardButton model))
     , div [] [ button [] [ text "Add" ] ]
     ]
 

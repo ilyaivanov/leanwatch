@@ -1,8 +1,7 @@
 module DictMoves exposing (..)
 
 import Dict exposing (Dict)
-import List.Extra exposing (findIndex)
-import Utils exposing (insertAtIndex, removeItem)
+import List.Extra exposing (findIndex, splitAt)
 
 
 type alias Parent a =
@@ -48,3 +47,20 @@ getStackByItem item stacks =
         |> List.filter (\( _, stack ) -> List.member item stack.children)
         |> List.map Tuple.second
         |> List.head
+
+
+insertAtIndex : Int -> item -> List item -> List item
+insertAtIndex index item ary =
+    let
+        ( left, right ) =
+            ary
+                |> splitAt index
+                |> Tuple.mapSecond (\r -> item :: r)
+    in
+    [ left, right ]
+        |> List.concat
+
+
+removeItem : item -> List item -> List item
+removeItem item items =
+    List.filter ((/=) item) items
