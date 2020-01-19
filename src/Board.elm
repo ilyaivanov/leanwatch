@@ -1,4 +1,4 @@
-port module Board exposing (..)
+port module Board exposing (Model, Msg(..), init, onBoardsLoaded, onUserProfileLoaded, update, view)
 
 import Dict exposing (Dict)
 import Embed.Youtube
@@ -9,12 +9,12 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Http
 import Json.Decode as Json
-import List.Extra exposing (findIndex, splitAt)
+import List.Extra exposing (findIndex)
 import Login
 import Process
 import Random
 import Task
-import Utils exposing (flip)
+import Utils exposing (..)
 
 
 noComand : Model -> ( Model, Cmd msg )
@@ -346,7 +346,7 @@ update msg model =
                             newStacks =
                                 model.stacks
                                     |> updateStack fromStackId (\s -> { s | items = removeItem itemOver s.items })
-                                    |> updateStack toStackId (\s -> { s | items = insertInto targetIndex itemOver s.items })
+                                    |> updateStack toStackId (\s -> { s | items = insertAtIndex targetIndex itemOver s.items })
                         in
                         noComand { model | stacks = newStacks }
 
@@ -514,17 +514,8 @@ mapItem =
         (Json.field "youtubeId" Json.string)
 
 
-createIds =
-    Random.list 10 createId
-
-
 createId =
     Random.float 0 1 |> Random.map String.fromFloat
-
-
-unpackMaybes : List (Maybe item) -> List item
-unpackMaybes maybes =
-    List.filterMap identity maybes
 
 
 moveStackToAnotherPosition : Model -> String -> String -> Dict String Board
@@ -538,7 +529,7 @@ moveStackToAnotherPosition model stackOver stackUnder =
     in
     model.boards
         |> updateBoard model.userProfile.selectedBoard (\s -> { s | stacks = removeItem stackOver s.stacks })
-        |> updateBoard model.userProfile.selectedBoard (\s -> { s | stacks = insertInto targetIndex stackOver s.stacks })
+        |> updateBoard model.userProfile.selectedBoard (\s -> { s | stacks = insertAtIndex targetIndex stackOver s.stacks })
 
 
 updateStack : String -> (Stack -> Stack) -> Dict String Stack -> Dict String Stack
@@ -549,38 +540,6 @@ updateStack stackId updater stacks =
 updateBoard : String -> (Board -> Board) -> Dict String Board -> Dict String Board
 updateBoard boardId updater boards =
     Dict.update boardId (Maybe.map (\v -> updater v)) boards
-
-
-insertInto : Int -> item -> List item -> List item
-insertInto index item ary =
-    let
-        ( left, right ) =
-            ary
-                |> splitAt index
-                |> Tuple.mapSecond (\r -> item :: r)
-    in
-    [ left, right ]
-        |> List.concat
-
-
-removeItem : item -> List item -> List item
-removeItem item items =
-    List.filter (notEquals item) items
-
-
-findLastItem : List item -> Maybe item
-findLastItem list =
-    List.drop (List.length list - 1) list |> List.head
-
-
-equals : val -> val -> Bool
-equals a b =
-    a == b
-
-
-notEquals : val -> val -> Bool
-notEquals a b =
-    a /= b
 
 
 

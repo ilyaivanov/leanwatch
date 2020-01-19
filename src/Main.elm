@@ -3,7 +3,6 @@ module Main exposing (main)
 import Board as Board
 import Browser exposing (Document)
 import Browser.Navigation as Nav
-import Dict exposing (Dict)
 import Html exposing (Attribute, Html, div, text)
 import Login as Login
 import Url exposing (Url)
