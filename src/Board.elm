@@ -1,7 +1,7 @@
 port module Board exposing (Item, Model, Msg(..), Stack, init, onBoardsLoaded, onUserProfileLoaded, update, view)
 
 import Dict exposing (Dict)
-import DictMoves exposing (Parent, moveItem, moveItemToEndOfStack)
+import DictMoves exposing (Parent, moveItem, moveItemToEnd)
 import Embed.Youtube
 import Embed.Youtube.Attributes
 import ExtraEvents exposing (..)
@@ -10,7 +10,6 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Http
 import Json.Decode as Json
-import List.Extra exposing (findIndex)
 import Login
 import Process
 import Random
@@ -57,7 +56,7 @@ mergeAndNormalizeResponse : BoardResponse -> Model -> Model
 mergeAndNormalizeResponse boardResponse model =
     let
         stacks =
-            Dict.fromList (List.map (\s -> ( s.id, { id = s.id, name = s.name, items = getIds s.items } )) boardResponse.stacks)
+            Dict.fromList (List.map (\s -> ( s.id, { id = s.id, name = s.name, children = getIds s.items } )) boardResponse.stacks)
 
         allItems =
             boardResponse.stacks |> List.map (\s -> s.items) |> List.concat
@@ -69,7 +68,7 @@ mergeAndNormalizeResponse boardResponse model =
             List.map (\s -> s.id)
     in
     { model
-        | boards = Dict.insert boardResponse.id (Board boardResponse.id boardResponse.name (getIds boardResponse.stacks)) model.boards
+        | boards = Dict.insert boardResponse.id { id = boardResponse.id, name = boardResponse.name, children = getIds boardResponse.stacks } model.boards
         , stacks = Dict.union stacks model.stacks
         , items = Dict.union items model.items
     }
@@ -79,10 +78,10 @@ denormalizeBoard : Board -> Model -> BoardResponse
 denormalizeBoard board model =
     let
         stacksNarrow =
-            board.stacks |> List.map (\id -> Dict.get id model.stacks) |> unpackMaybes
+            board.children |> List.map (\id -> Dict.get id model.stacks) |> unpackMaybes
 
         stacks =
-            stacksNarrow |> List.map (\s -> { id = s.id, name = s.name, items = s.items |> List.map (\id -> Dict.get id model.items) |> unpackMaybes })
+            stacksNarrow |> List.map (\s -> { id = s.id, name = s.name, items = s.children |> List.map (\id -> Dict.get id model.items) |> unpackMaybes })
     in
     { id = board.id
     , name = board.name
@@ -122,13 +121,6 @@ type SidebarState
     = Hidden
     | Search
     | Boards
-
-
-type alias Board =
-    { id : String
-    , name : String
-    , stacks : List String
-    }
 
 
 type Msg
@@ -176,6 +168,12 @@ init =
     , videoBeingPlayed = Nothing
     , sidebarState = Boards
     }
+
+
+type alias Board =
+    Parent
+        { name : String
+        }
 
 
 type alias Stack =
@@ -246,18 +244,9 @@ getStackToView model stackId =
             getStack stackId model.stacks
 
         items =
-            stack.items |> List.map (\itemId -> Dict.get itemId model.items) |> unpackMaybes
+            stack.children |> List.map (\itemId -> Dict.get itemId model.items) |> unpackMaybes
     in
     ( stack, items )
-
-
-getStackByItem : String -> Dict String Stack -> Stack
-getStackByItem item stacks =
-    Dict.toList stacks
-        |> List.filter (\( _, stack ) -> List.member item stack.items)
-        |> List.map Tuple.second
-        |> List.head
-        |> Maybe.withDefault { id = "NOT_FOUND", name = "NOT_FOUND", items = [] }
 
 
 getItemById : String -> Model -> Maybe Item
@@ -270,7 +259,7 @@ getItemById itemId model =
 
 getStack : String -> Dict String Stack -> Stack
 getStack stackId stacks =
-    Dict.get stackId stacks |> Maybe.withDefault { id = "NOT_FOUND", name = "NOT_FOUND", items = [] }
+    Dict.get stackId stacks |> Maybe.withDefault { id = "NOT_FOUND", name = "NOT_FOUND", children = [] }
 
 
 getBoardViewModel : Model -> Maybe Board
@@ -332,7 +321,7 @@ update msg model =
         StackEnterDuringDrag stackUnder ->
             case model.dragState of
                 DraggingStack _ _ stackOver ->
-                    noComand { model | boards = moveStackToAnotherPosition model stackOver stackUnder }
+                    noComand { model | boards = moveItem model.boards { from = stackOver, to = stackUnder } }
 
                 _ ->
                     noComand model
@@ -340,10 +329,10 @@ update msg model =
         StackOverlayEnterDuringDrag stackUnder ->
             case model.dragState of
                 DraggingStack _ _ stackOver ->
-                    noComand { model | boards = moveStackToAnotherPosition model stackOver stackUnder }
+                    noComand { model | boards = moveItem model.boards { from = stackOver, to = stackUnder } }
 
                 DraggingItem _ _ itemOver ->
-                    noComand { model | stacks = moveItemToEndOfStack model.stacks { itemToMove = itemOver, targetStack = stackUnder } }
+                    noComand { model | stacks = moveItemToEnd model.stacks { itemToMove = itemOver, targetParent = stackUnder } }
 
                 _ ->
                     noComand model
@@ -351,8 +340,8 @@ update msg model =
         CreateStack newStackId ->
             noComand
                 { model
-                    | boards = updateBoard model.userProfile.selectedBoard (\b -> { b | stacks = List.append b.stacks [ newStackId ] }) model.boards
-                    , stacks = Dict.insert newStackId { id = newStackId, name = "New Stack", items = [] } model.stacks
+                    | boards = updateBoard model.userProfile.selectedBoard (\b -> { b | children = List.append b.children [ newStackId ] }) model.boards
+                    , stacks = Dict.insert newStackId { id = newStackId, name = "New Stack", children = [] } model.stacks
                 }
 
         OnSearchInput val ->
@@ -384,19 +373,16 @@ update msg model =
             case response of
                 Ok body ->
                     let
-                        newItems =
-                            body.items
-
                         ids =
-                            List.map (\i -> i.id) newItems
+                            List.map .id body.items
 
                         newItemsDict =
-                            Dict.fromList (List.map (\i -> ( i.id, i )) newItems)
+                            Dict.fromList (List.map (\i -> ( i.id, i )) body.items)
 
                         itemsUpdated =
                             Dict.union newItemsDict model.items
                     in
-                    noComand { model | stacks = Dict.update "SEARCH" (\_ -> Just { id = "SEARCH", name = "New Stack", items = ids }) model.stacks, items = itemsUpdated }
+                    noComand { model | stacks = Dict.update "SEARCH" (\_ -> Just { id = "SEARCH", name = "New Stack", children = ids }) model.stacks, items = itemsUpdated }
 
                 _ ->
                     noComand model
@@ -455,25 +441,6 @@ mapItem =
 
 createId =
     Random.float 0 1 |> Random.map String.fromFloat
-
-
-moveStackToAnotherPosition : Model -> String -> String -> Dict String Board
-moveStackToAnotherPosition model stackOver stackUnder =
-    let
-        board =
-            Dict.get model.userProfile.selectedBoard model.boards |> Maybe.withDefault { id = "", name = "", stacks = [] }
-
-        targetIndex =
-            findIndex (equals stackUnder) board.stacks |> Maybe.withDefault -1
-    in
-    model.boards
-        |> updateBoard model.userProfile.selectedBoard (\s -> { s | stacks = removeItem stackOver s.stacks })
-        |> updateBoard model.userProfile.selectedBoard (\s -> { s | stacks = insertAtIndex targetIndex stackOver s.stacks })
-
-
-updateStack : String -> (Stack -> Stack) -> Dict String Stack -> Dict String Stack
-updateStack stackId updater stacks =
-    Dict.update stackId (Maybe.map (\v -> updater v)) stacks
 
 
 updateBoard : String -> (Board -> Board) -> Dict String Board -> Dict String Board
@@ -537,7 +504,7 @@ viewBoard model =
                 , div
                     [ class "columns-container" ]
                     (List.append
-                        (board.stacks
+                        (board.children
                             |> List.map (\stackId -> Dict.get stackId model.stacks)
                             |> unpackMaybes
                             |> List.map (\stack -> viewStack model.dragState [ class "column-board" ] (getStackToView model stack.id))
@@ -601,7 +568,7 @@ viewSearch model =
         items =
             case stackM of
                 Just stack ->
-                    stack.items |> List.map (\itemId -> Dict.get itemId model.items) |> unpackMaybes
+                    stack.children |> List.map (\itemId -> Dict.get itemId model.items) |> unpackMaybes
 
                 Nothing ->
                     []

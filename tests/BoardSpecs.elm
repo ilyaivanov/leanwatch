@@ -1,7 +1,7 @@
 module BoardSpecs exposing (..)
 
 import Dict exposing (Dict)
-import DictMoves exposing (moveItem, moveItemToEndOfStack)
+import DictMoves exposing (moveItem, moveItemToEnd)
 import Expect exposing (Expectation)
 import Test exposing (..)
 
@@ -14,14 +14,14 @@ suite =
                 let
                     initial =
                         Dict.fromList
-                            [ ( "Stack 1", { id = "Stack 1", items = [ "Item_1", "Item_2" ] } )
-                            , ( "Stack 2", { id = "Stack 2", items = [ "Item_3", "Item_4" ] } )
+                            [ ( "Stack 1", { id = "Stack 1", children = [ "Item_1", "Item_2" ] } )
+                            , ( "Stack 2", { id = "Stack 2", children = [ "Item_3", "Item_4" ] } )
                             ]
 
                     expected =
                         Dict.fromList
-                            [ ( "Stack 1", { id = "Stack 1", items = [ "Item_1", "Item_3", "Item_2" ] } )
-                            , ( "Stack 2", { id = "Stack 2", items = [ "Item_4" ] } )
+                            [ ( "Stack 1", { id = "Stack 1", children = [ "Item_1", "Item_3", "Item_2" ] } )
+                            , ( "Stack 2", { id = "Stack 2", children = [ "Item_4" ] } )
                             ]
 
                     received =
@@ -34,18 +34,18 @@ suite =
                 let
                     initial =
                         Dict.fromList
-                            [ ( "Stack 1", { id = "Stack 1", items = [ "Item_1", "Item_2" ] } )
-                            , ( "Stack 2", { id = "Stack 2", items = [ "Item_3", "Item_4" ] } )
+                            [ ( "Stack 1", { id = "Stack 1", children = [ "Item_1", "Item_2" ] } )
+                            , ( "Stack 2", { id = "Stack 2", children = [ "Item_3", "Item_4" ] } )
                             ]
 
                     expected =
                         Dict.fromList
-                            [ ( "Stack 1", { id = "Stack 1", items = [ "Item_2" ] } )
-                            , ( "Stack 2", { id = "Stack 2", items = [ "Item_3", "Item_4", "Item_1" ] } )
+                            [ ( "Stack 1", { id = "Stack 1", children = [ "Item_2" ] } )
+                            , ( "Stack 2", { id = "Stack 2", children = [ "Item_3", "Item_4", "Item_1" ] } )
                             ]
 
                     received =
-                        moveItemToEndOfStack initial { itemToMove = "Item_1", targetStack = "Stack 2" }
+                        moveItemToEnd initial { itemToMove = "Item_1", targetParent = "Stack 2" }
                 in
                 received |> Expect.equal expected
             )

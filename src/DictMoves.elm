@@ -6,18 +6,18 @@ import Utils exposing (insertAtIndex, removeItem)
 
 
 type alias Parent a =
-    { a | id : String, items : List String }
+    { a | id : String, children : List String }
 
 
 moveItem : Dict String (Parent a) -> { from : String, to : String } -> Dict String (Parent a)
 moveItem dict { from, to } =
     case ( getStackByItem from dict, getStackByItem to dict ) of
         ( Just fromStack, Just toStack ) ->
-            case findIndex (equals to) toStack.items of
+            case findIndex ((==) to) toStack.children of
                 Just targetIndex ->
                     dict
-                        |> updateStack fromStack.id (\s -> { s | items = removeItem from s.items })
-                        |> updateStack toStack.id (\s -> { s | items = insertAtIndex targetIndex from s.items })
+                        |> updateStack fromStack.id (\s -> { s | children = removeItem from s.children })
+                        |> updateStack toStack.id (\s -> { s | children = insertAtIndex targetIndex from s.children })
 
                 Nothing ->
                     dict
@@ -26,29 +26,25 @@ moveItem dict { from, to } =
             dict
 
 
-moveItemToEndOfStack : Dict String (Parent a) -> { itemToMove : String, targetStack : String } -> Dict String (Parent a)
-moveItemToEndOfStack dict { itemToMove, targetStack } =
-    case ( getStackByItem itemToMove dict, Dict.get targetStack dict ) of
+moveItemToEnd : Dict String (Parent a) -> { itemToMove : String, targetParent : String } -> Dict String (Parent a)
+moveItemToEnd dict { itemToMove, targetParent } =
+    case ( getStackByItem itemToMove dict, Dict.get targetParent dict ) of
         ( Just fromStack, Just toStack ) ->
             dict
-                |> updateStack fromStack.id (\s -> { s | items = removeItem itemToMove s.items })
-                |> updateStack toStack.id (\s -> { s | items = List.append s.items [ itemToMove ] })
+                |> updateStack fromStack.id (\s -> { s | children = removeItem itemToMove s.children })
+                |> updateStack toStack.id (\s -> { s | children = List.append s.children [ itemToMove ] })
 
         _ ->
             dict
 
 
-updateStack stackId updater dictS =
-    Dict.update stackId (Maybe.map (\v -> updater v)) dictS
+updateStack stackId updater =
+    Dict.update stackId (Maybe.map updater)
 
 
 getStackByItem : String -> Dict String (Parent a) -> Maybe (Parent a)
 getStackByItem item stacks =
     Dict.toList stacks
-        |> List.filter (\( _, stack ) -> List.member item stack.items)
+        |> List.filter (\( _, stack ) -> List.member item stack.children)
         |> List.map Tuple.second
         |> List.head
-
-
-equals a b =
-    a == b
