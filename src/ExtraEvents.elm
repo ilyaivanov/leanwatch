@@ -3,7 +3,7 @@ module ExtraEvents exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Json.Decode as Decode
+import Json.Decode as Json
 
 
 type alias MouseMoveEvent =
@@ -27,42 +27,56 @@ type alias MouseDownEvent =
 
 onMouseMove : (MouseMoveEvent -> msg) -> Attribute msg
 onMouseMove tagger =
-    on "mousemove" (Decode.map tagger mouseMoveDecoder)
+    on "mousemove" (Json.map tagger mouseMoveDecoder)
 
 
 onMouseDown : (MouseDownEvent -> msg) -> Attribute msg
 onMouseDown tagger =
-    on "mousedown" (Decode.map tagger mouseDownDecoder)
+    on "mousedown" (Json.map tagger mouseDownDecoder)
 
 
 onMouseUp : msg -> Attribute msg
 onMouseUp tagger =
-    on "mouseup" (Decode.succeed tagger)
+    on "mouseup" (Json.succeed tagger)
 
 
 onMouseEnter : msg -> Attribute msg
 onMouseEnter tagger =
-    on "mouseenter" (Decode.succeed tagger)
+    on "mouseenter" (Json.succeed tagger)
 
 
-mouseDownDecoder : Decode.Decoder MouseDownEvent
+mouseDownDecoder : Json.Decoder MouseDownEvent
 mouseDownDecoder =
-    Decode.map2 MouseDownEvent offsetsDecoder mouseMoveDecoder
+    Json.map2 MouseDownEvent offsetsDecoder mouseMoveDecoder
 
 
-mouseMoveDecoder : Decode.Decoder MouseMoveEvent
+mouseMoveDecoder : Json.Decoder MouseMoveEvent
 mouseMoveDecoder =
-    Decode.map3 MouseMoveEvent
-        (Decode.field "pageX" Decode.int)
-        (Decode.field "pageY" Decode.int)
-        (Decode.field "buttons" Decode.int)
+    Json.map3 MouseMoveEvent
+        (Json.field "pageX" Json.int)
+        (Json.field "pageY" Json.int)
+        (Json.field "buttons" Json.int)
 
 
-offsetsDecoder : Decode.Decoder Offsets
+offsetsDecoder : Json.Decoder Offsets
 offsetsDecoder =
-    Decode.map2 Offsets
-        (Decode.field "offsetX" Decode.int)
-        (Decode.field "offsetY" Decode.int)
+    Json.map2 Offsets
+        (Json.field "offsetX" Json.int)
+        (Json.field "offsetY" Json.int)
+
+
+onKeyUp : (String -> msg) -> Attribute msg
+onKeyUp tagger =
+    on "keyup" (Json.map tagger (Json.field "key" Json.string))
+
+
+onClickAlwaysStopPropagation : msg -> Attribute msg
+onClickAlwaysStopPropagation msg =
+    stopPropagationOn "click" (Json.map alwaysStop (Json.succeed msg))
+
+
+alwaysStop x =
+    ( x, True )
 
 
 onClickIf : Bool -> msg -> Attribute msg

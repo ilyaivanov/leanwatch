@@ -1,13 +1,14 @@
 port module Board exposing (Item, Model, Msg(..), Stack, init, onBoardsLoaded, onUserProfileLoaded, update, view)
 
+import Browser.Dom as Dom exposing (focus)
 import Dict exposing (Dict)
 import DictMoves exposing (Parent, moveItem, moveItemToEnd)
 import Embed.Youtube
 import Embed.Youtube.Attributes
 import ExtraEvents exposing (..)
 import Html exposing (..)
-import Html.Attributes exposing (..)
-import Html.Events exposing (onClick, onInput)
+import Html.Attributes as Attributes exposing (..)
+import Html.Events exposing (onBlur, onClick, onInput)
 import Http
 import Json.Decode as Json
 import Login
@@ -103,6 +104,7 @@ type alias Model =
     -- UI STATE
     , sidebarState : SidebarState
     , dragState : DragState
+    , modificationState : ModificationState
     , searchTerm : String
 
     -- Used to debounce search on input
@@ -115,6 +117,11 @@ type DragState
     | ItemPressedNotYetMoved MouseMoveEvent Offsets String
     | DraggingItem MouseMoveEvent Offsets String
     | DraggingStack MouseMoveEvent Offsets String
+
+
+type ModificationState
+    = NoModification
+    | Modifying { itemId : String, newName : String }
 
 
 type SidebarState
@@ -151,6 +158,11 @@ type Msg
     | SaveSelectedBoard
     | OnCreateNewBoard
     | CreateNewBoard String
+    | StartModifyingItem { itemId : String, newName : String }
+    | SetNewName String
+    | ApplyModification
+    | OnModificationKeyUp String
+    | FocusResult (Result Dom.Error ())
 
 
 init : Model
@@ -163,6 +175,7 @@ init =
         , boards = []
         }
     , dragState = NoDrag
+    , modificationState = NoModification
     , searchTerm = ""
     , currentSearchId = ""
     , videoBeingPlayed = Nothing
@@ -231,6 +244,15 @@ isDraggingAnything dragState =
 
         _ ->
             True
+
+
+isModifyingItem modificationState currentItemId =
+    case modificationState of
+        Modifying { itemId } ->
+            itemId == currentItemId
+
+        NoModification ->
+            False
 
 
 getSearchStack : Model -> Maybe Stack
@@ -431,8 +453,46 @@ update msg model =
             in
             ( { model | userProfile = newProfile, boards = Dict.insert id newBoard model.boards }, Cmd.none )
 
+        StartModifyingItem item ->
+            ( { model | modificationState = Modifying item }, focus item.itemId |> Task.attempt FocusResult )
+
+        SetNewName newName ->
+            case model.modificationState of
+                Modifying mod ->
+                    ( { model | modificationState = Modifying { mod | newName = newName } }, Cmd.none )
+
+                NoModification ->
+                    ( model, Cmd.none )
+
+        ApplyModification ->
+            ( finishModification model, Cmd.none )
+
+        OnModificationKeyUp key ->
+            if key == "Enter" || key == "Escape" then
+                ( finishModification model, Cmd.none )
+
+            else
+                ( model, Cmd.none )
+
         Noop ->
             noComand model
+
+        FocusResult _ ->
+            noComand model
+
+
+finishModification : Model -> Model
+finishModification model =
+    case model.modificationState of
+        Modifying { itemId, newName } ->
+            { model | modificationState = NoModification, boards = updateBoardName model.boards itemId newName }
+
+        NoModification ->
+            model
+
+
+updateBoardName boards boardId newName =
+    Dict.update boardId (Maybe.map (\s -> { s | name = newName })) boards
 
 
 decodeItems : Json.Decoder SearchResponse
@@ -599,14 +659,27 @@ viewBoards model =
     ]
 
 
-viewBoardButton model { name, id } =
-    div [ class "sidebar-boards-button", classIf (model.userProfile.selectedBoard == id) "active", onClick (SelectBoard id) ]
-        [ text name
+viewBoardButton model item =
+    div [ class "sidebar-boards-button", classIf (model.userProfile.selectedBoard == item.id) "active", onClick (SelectBoard item.id) ]
+        [ viewContent model.modificationState item
         , div [ class "sidebar-boards-button-actions" ]
-            [ button [] [ text "E" ]
+            [ button [ onClickAlwaysStopPropagation (StartModifyingItem { itemId = item.id, newName = item.name }) ] [ text "E" ]
             , button [] [ text "X" ]
             ]
         ]
+
+
+viewContent modificationState { name, id } =
+    case modificationState of
+        Modifying { itemId, newName } ->
+            if itemId == id then
+                input [ onBlur ApplyModification, Attributes.id id, value newName, onInput SetNewName, onKeyUp OnModificationKeyUp ] []
+
+            else
+                text name
+
+        NoModification ->
+            text name
 
 
 viewItem : List (Attribute Msg) -> Bool -> Item -> Html Msg
