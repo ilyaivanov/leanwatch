@@ -2,6 +2,7 @@ module DictMoves exposing (..)
 
 import Dict exposing (Dict)
 import List.Extra exposing (findIndex, splitAt)
+import ListUtils exposing (removeItem)
 
 
 type alias Parent a =
@@ -59,8 +60,3 @@ insertAtIndex index item ary =
     in
     [ left, right ]
         |> List.concat
-
-
-removeItem : item -> List item -> List item
-removeItem item items =
-    List.filter ((/=) item) items

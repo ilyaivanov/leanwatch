@@ -11,11 +11,11 @@ import Html.Attributes as Attributes exposing (..)
 import Html.Events exposing (onBlur, onClick, onInput)
 import Http
 import Json.Decode as Json
+import ListUtils exposing (flipArguments, ignoreNothing, removeItem)
 import Login
 import Process
 import Random
 import Task
-import Utils exposing (flipArguments, ignoreNothing)
 
 
 noComand : Model -> ( Model, Cmd msg )
@@ -158,8 +158,9 @@ type Msg
     | SaveSelectedBoard
     | OnCreateNewBoard
     | CreateNewBoard String
+    | RemoveBoard String
     | StartModifyingItem { itemId : String, newName : String }
-    | SetNewName String
+    | OnNewNameEnter String
     | ApplyModification
     | OnModificationKeyUp String
     | FocusResult (Result Dom.Error ())
@@ -244,15 +245,6 @@ isDraggingAnything dragState =
 
         _ ->
             True
-
-
-isModifyingItem modificationState currentItemId =
-    case modificationState of
-        Modifying { itemId } ->
-            itemId == currentItemId
-
-        NoModification ->
-            False
 
 
 getSearchStack : Model -> Maybe Stack
@@ -456,7 +448,7 @@ update msg model =
         StartModifyingItem item ->
             ( { model | modificationState = Modifying item }, focus item.itemId |> Task.attempt FocusResult )
 
-        SetNewName newName ->
+        OnNewNameEnter newName ->
             case model.modificationState of
                 Modifying mod ->
                     ( { model | modificationState = Modifying { mod | newName = newName } }, Cmd.none )
@@ -473,6 +465,26 @@ update msg model =
 
             else
                 ( model, Cmd.none )
+
+        RemoveBoard boardId ->
+            let
+                profile =
+                    model.userProfile
+
+                newBoards =
+                    removeItem boardId profile.boards
+
+                nextSelectedBoard =
+                    if profile.selectedBoard == boardId then
+                        List.head newBoards |> Maybe.withDefault ""
+
+                    else
+                        profile.selectedBoard
+
+                newProfile =
+                    { profile | boards = removeItem boardId profile.boards, selectedBoard = nextSelectedBoard }
+            in
+            noComand { model | userProfile = newProfile, boards = Dict.remove boardId model.boards }
 
         Noop ->
             noComand model
@@ -664,7 +676,7 @@ viewBoardButton model item =
         [ viewContent model.modificationState item
         , div [ class "sidebar-boards-button-actions" ]
             [ button [ onClickAlwaysStopPropagation (StartModifyingItem { itemId = item.id, newName = item.name }) ] [ text "E" ]
-            , button [] [ text "X" ]
+            , button [ onClickAlwaysStopPropagation (RemoveBoard item.id) ] [ text "X" ]
             ]
         ]
 
@@ -673,7 +685,7 @@ viewContent modificationState { name, id } =
     case modificationState of
         Modifying { itemId, newName } ->
             if itemId == id then
-                input [ onBlur ApplyModification, Attributes.id id, value newName, onInput SetNewName, onKeyUp OnModificationKeyUp ] []
+                input [ onBlur ApplyModification, Attributes.id id, value newName, onInput OnNewNameEnter, onKeyUp OnModificationKeyUp ] []
 
             else
                 text name
