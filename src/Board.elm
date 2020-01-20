@@ -149,6 +149,8 @@ type Msg
     | UserProfileLoaded UserProfile
     | BoardsLoaded (List BoardResponse)
     | SaveSelectedBoard
+    | OnCreateNewBoard
+    | CreateNewBoard String
 
 
 init : Model
@@ -413,6 +415,22 @@ update msg model =
                 Nothing ->
                     noComand model
 
+        OnCreateNewBoard ->
+            ( model, Random.generate CreateNewBoard createId )
+
+        CreateNewBoard id ->
+            let
+                profile =
+                    model.userProfile
+
+                newProfile =
+                    { profile | selectedBoard = id, boards = profile.boards ++ [ id ] }
+
+                newBoard =
+                    { id = id, name = "New Board", children = [] }
+            in
+            ( { model | userProfile = newProfile, boards = Dict.insert id newBoard model.boards }, Cmd.none )
+
         Noop ->
             noComand model
 
@@ -577,7 +595,7 @@ viewBoards model =
         , button [ onClick (SetSidebar Hidden) ] [ text "<" ]
         ]
     , div [] (model.userProfile.boards |> List.map (flipArguments Dict.get model.boards) |> ignoreNothing |> List.map (viewBoardButton model))
-    , div [] [ button [] [ text "Add" ] ]
+    , div [] [ button [ onClick OnCreateNewBoard ] [ text "Add" ] ]
     ]
 
 
