@@ -26,6 +26,16 @@ moveItem dict { from, to } =
             dict
 
 
+moveItemInList : List String -> { from : String, to : String } -> List String
+moveItemInList items { from, to } =
+    case findIndex ((==) to) items of
+        Just index ->
+            items |> removeItem from |> insertAtIndex index from
+
+        Nothing ->
+            items
+
+
 moveItemToEnd : Dict String (Parent a) -> { itemToMove : String, targetParent : String } -> Dict String (Parent a)
 moveItemToEnd dict { itemToMove, targetParent } =
     case ( getStackByItem itemToMove dict, Dict.get targetParent dict ) of

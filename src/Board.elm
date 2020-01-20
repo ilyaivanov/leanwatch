@@ -2,7 +2,7 @@ port module Board exposing (Item, Model, Msg(..), Stack, init, onBoardsLoaded, o
 
 import Browser.Dom as Dom exposing (focus)
 import Dict exposing (Dict)
-import DictMoves exposing (Parent, moveItem, moveItemToEnd)
+import DictMoves exposing (Parent, moveItem, moveItemInList, moveItemToEnd)
 import Embed.Youtube
 import Embed.Youtube.Attributes
 import ExtraEvents exposing (..)
@@ -115,8 +115,10 @@ type alias Model =
 type DragState
     = NoDrag
     | ItemPressedNotYetMoved MouseMoveEvent Offsets String
+    | BoardPressedNotYetMoved MouseMoveEvent Offsets String
     | DraggingItem MouseMoveEvent Offsets String
     | DraggingStack MouseMoveEvent Offsets String
+    | DraggingBoard MouseMoveEvent Offsets String
 
 
 type ModificationState
@@ -135,10 +137,12 @@ type Msg
       -- DND events
     | StackTitleMouseDown String MouseDownEvent
     | ItemMouseDown String MouseDownEvent
+    | BoardMouseDown String MouseDownEvent
     | MouseMove MouseMoveEvent
     | MouseUp
     | StackOverlayEnterDuringDrag String
     | StackEnterDuringDrag String
+    | BoardEnterDuringDrag String
     | ItemEnterDuringDrag String
       -- Board
     | CreateStack String
@@ -224,6 +228,26 @@ isDraggingStack dragState stackId =
             False
 
 
+isDraggingBoard : DragState -> String -> Bool
+isDraggingBoard dragState boardId =
+    case dragState of
+        DraggingBoard _ _ boardBeingDragged ->
+            boardBeingDragged == boardId
+
+        _ ->
+            False
+
+
+isDraggingAnyBoard : DragState -> Bool
+isDraggingAnyBoard dragState =
+    case dragState of
+        DraggingBoard _ _ _ ->
+            True
+
+        _ ->
+            False
+
+
 isDraggingItem : DragState -> Item -> Bool
 isDraggingItem dragState { id } =
     case dragState of
@@ -291,6 +315,9 @@ update msg model =
         ItemMouseDown itemId { mousePosition, offsets } ->
             noComand { model | dragState = ItemPressedNotYetMoved mousePosition offsets itemId }
 
+        BoardMouseDown itemId { mousePosition, offsets } ->
+            noComand { model | dragState = BoardPressedNotYetMoved mousePosition offsets itemId }
+
         MouseUp ->
             case model.dragState of
                 ItemPressedNotYetMoved _ _ id ->
@@ -312,6 +339,12 @@ update msg model =
 
                 ( DraggingItem _ offsets id, 1 ) ->
                     noComand { model | dragState = DraggingItem newMousePosition offsets id }
+
+                ( BoardPressedNotYetMoved _ offsets id, 1 ) ->
+                    noComand { model | dragState = DraggingBoard newMousePosition offsets id }
+
+                ( DraggingBoard _ offsets id, 1 ) ->
+                    noComand { model | dragState = DraggingBoard newMousePosition offsets id }
 
                 -- Any registered mouse move without mouse pressed is ending eny drag session
                 ( _, 0 ) ->
@@ -336,6 +369,21 @@ update msg model =
             case model.dragState of
                 DraggingStack _ _ stackOver ->
                     noComand { model | boards = moveItem model.boards { from = stackOver, to = stackUnder } }
+
+                _ ->
+                    noComand model
+
+        BoardEnterDuringDrag boardUnder ->
+            case model.dragState of
+                DraggingBoard _ _ boardOver ->
+                    let
+                        profile =
+                            model.userProfile
+
+                        newOrder =
+                            moveItemInList model.userProfile.boards { from = boardOver, to = boardUnder }
+                    in
+                    noComand { model | userProfile = { profile | boards = newOrder } }
 
                 _ ->
                     noComand model
@@ -554,6 +602,7 @@ view model login =
                     , viewBoard model
                     ]
                 , viewPlayer model
+                , viewElementBeingDragged model
                 ]
 
 
@@ -594,7 +643,7 @@ viewBoard model =
                             |> ignoreNothing
                             |> List.map (\stack -> viewStack model.dragState [ class "column-board" ] (getStackToView model stack.id))
                         )
-                        [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ], viewElementBeingDragged model ]
+                        [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ] ]
                     )
                 ]
 
@@ -669,13 +718,29 @@ viewBoards model =
         [ h3 [] [ text "Boards" ]
         , button [ onClick (SetSidebar Hidden) ] [ text "<" ]
         ]
-    , div [] (model.userProfile.boards |> List.map (flipArguments Dict.get model.boards) |> ignoreNothing |> List.map (viewBoardButton model))
+    , div []
+        (model.userProfile.boards
+            |> List.map (flipArguments Dict.get model.boards)
+            |> ignoreNothing
+            |> List.map (\item -> viewBoardButton model (isDraggingBoard model.dragState item.id) [] item)
+        )
     , div [] [ button [ onClick OnCreateNewBoard ] [ text "Add" ] ]
     ]
 
 
-viewBoardButton model item =
-    div [ class "sidebar-boards-button", classIf (model.userProfile.selectedBoard == item.id) "active", onClick (SelectBoard item.id) ]
+viewBoardButton : Model -> Bool -> List (Attribute Msg) -> Board -> Html Msg
+viewBoardButton model isDragging attrs item =
+    div
+        (List.append
+            [ class "sidebar-boards-button"
+            , classIf (model.userProfile.selectedBoard == item.id) "active"
+            , onClickIf (not (isDraggingAnyBoard model.dragState)) (SelectBoard item.id)
+            , onMouseDown (BoardMouseDown item.id)
+            , onMouseEnter (BoardEnterDuringDrag item.id)
+            , classIf isDragging "item-preview"
+            ]
+            attrs
+        )
         [ viewContent model.modificationState item
         , div [ class "sidebar-boards-button-actions" ]
             [ button [ onClickAlwaysStopPropagation (StartModifyingItem { itemId = item.id, newName = item.name }) ] [ text "E" ]
@@ -736,7 +801,27 @@ viewElementBeingDragged model =
                 ]
                 ( stack, items )
 
-        _ ->
+        DraggingBoard mouseMoveEvent offsets boardId ->
+            case model.boards |> Dict.get boardId of
+                Just actualBoard ->
+                    viewBoardButton model
+                        False
+                        [ class "item-dragged"
+                        , style "left" (String.fromInt (mouseMoveEvent.pageX - offsets.offsetX) ++ "px")
+                        , style "top" (String.fromInt (mouseMoveEvent.pageY - offsets.offsetY) ++ "px")
+                        ]
+                        actualBoard
+
+                Nothing ->
+                    div [] []
+
+        NoDrag ->
+            div [] []
+
+        ItemPressedNotYetMoved _ _ _ ->
+            div [] []
+
+        BoardPressedNotYetMoved _ _ _ ->
             div [] []
 
 

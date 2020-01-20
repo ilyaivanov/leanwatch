@@ -67,8 +67,9 @@ body {
   height: 40px;
   display: flex;
   align-items: center;
+  width: var(--sidebar-width);
   padding: var(--item-padding);
-  padding-left: calc(var(--item-padding) + 4px);
+  padding-left: calc(var(--item-padding));
   border-bottom: 1px lightgrey solid;
   cursor: var(--drag-cursor);
   position: relative;
@@ -83,10 +84,13 @@ body {
   display: flex;
 }
 
+.sidebar-boards-button:hover.item-preview .sidebar-boards-button-actions{
+  display: none;
+}
+
 .sidebar-boards-button.active {
   background-color: rgba(0, 0, 0, 0.2);
   padding-left: calc(var(--item-padding));
-  border-left: 4px white solid;
 }
 
 /* BOARD and STACKS */
