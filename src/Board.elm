@@ -543,7 +543,11 @@ view model login =
             div [] [ text "Loading user profile..." ]
 
         _ ->
-            div (attributesIf (model.dragState /= NoDrag) [ onMouseMove MouseMove, onMouseUp MouseUp ])
+            div
+                [ attributeIf (model.dragState /= NoDrag) (onMouseMove MouseMove)
+                , attributeIf (model.dragState /= NoDrag) (onMouseUp MouseUp)
+                , classIf (isDraggingAnything model.dragState) "board-during-drag"
+                ]
                 [ viewTopBar model login
                 , div []
                     [ viewSidebar model
@@ -580,7 +584,6 @@ viewBoard model =
             div
                 [ class "board"
                 , classIf (model.sidebarState /= Hidden) "board-with-sidebar"
-                , classIf (isDraggingAnything model.dragState) "board-during-drag"
                 ]
                 [ viewBoardBar board
                 , div

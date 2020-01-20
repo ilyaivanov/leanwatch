@@ -6,7 +6,7 @@
   --double-item-padding: 1em;
   --board-header-height: 40px;
   --top-bar-height: 40px;
-
+  --drag-cursor: pointer;
   --sidebar-width: calc(var(--item-width) + var(--double-item-padding));
   --board-width: 100vw;
   --board-width-with-sidebar: calc(
@@ -70,7 +70,7 @@ body {
   padding: var(--item-padding);
   padding-left: calc(var(--item-padding) + 4px);
   border-bottom: 1px lightgrey solid;
-  cursor: pointer;
+  cursor: var(--drag-cursor);
   position: relative;
 }
 .sidebar-boards-button-actions{
@@ -123,10 +123,11 @@ body {
 }
 
 .board-during-drag {
-  cursor: grabbing;
+  --drag-cursor: grabbing;
+  cursor: var(--drag-cursor);
 }
 
-.board-during-drag .item {
+.board-during-drag button {
   cursor: inherit;
 }
 
@@ -145,7 +146,7 @@ body {
   padding: var(--item-padding);
   height: 2em;
   user-select: none;
-  cursor: pointer;
+  cursor: var(--drag-cursor);
   /* background-color: rgb(234, 253, 205); */
 }
 
@@ -175,7 +176,7 @@ body {
   background-color: white;
   display: flex;
   margin-top: var(--item-padding);
-  cursor: pointer;
+  cursor: var(--drag-cursor);
   position: relative;
 }
 
@@ -307,7 +308,7 @@ button.active {
   display: flex;
   justify-content: center;
   align-items: center;
-  cursor: pointer;
+  cursor: var(--drag-cursor);
 }
 
 .button.flat {

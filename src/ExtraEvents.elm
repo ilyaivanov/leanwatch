@@ -97,13 +97,13 @@ classIf condition className =
         emptyAttribute
 
 
-attributesIf : Bool -> List (Attribute msg) -> List (Attribute msg)
-attributesIf condition attributes =
+attributeIf : Bool -> Attribute msg -> Attribute msg
+attributeIf condition attribute =
     if condition then
-        attributes
+        attribute
 
     else
-        []
+        class ""
 
 
 emptyAttribute =
