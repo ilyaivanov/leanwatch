@@ -151,7 +151,18 @@ body {
   height: 2em;
   user-select: none;
   cursor: var(--drag-cursor);
+  position: relative;
   /* background-color: rgb(234, 253, 205); */
+}
+.column-title-actions{
+  display: none;
+  flex-direction: row;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+.column-title:hover .column-title-actions{
+  display: flex;
 }
 
 .column-content {

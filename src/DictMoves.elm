@@ -11,7 +11,7 @@ type alias Parent a =
 
 moveItem : Dict String (Parent a) -> { from : String, to : String } -> Dict String (Parent a)
 moveItem dict { from, to } =
-    case ( getStackByItem from dict, getStackByItem to dict ) of
+    case ( getParentByChildren from dict, getParentByChildren to dict ) of
         ( Just fromStack, Just toStack ) ->
             case findIndex ((==) to) toStack.children of
                 Just targetIndex ->
@@ -38,7 +38,7 @@ moveItemInList items { from, to } =
 
 moveItemToEnd : Dict String (Parent a) -> { itemToMove : String, targetParent : String } -> Dict String (Parent a)
 moveItemToEnd dict { itemToMove, targetParent } =
-    case ( getStackByItem itemToMove dict, Dict.get targetParent dict ) of
+    case ( getParentByChildren itemToMove dict, Dict.get targetParent dict ) of
         ( Just fromStack, Just toStack ) ->
             dict
                 |> updateStack fromStack.id (\s -> { s | children = removeItem itemToMove s.children })
@@ -52,8 +52,8 @@ updateStack stackId updater =
     Dict.update stackId (Maybe.map updater)
 
 
-getStackByItem : String -> Dict String (Parent a) -> Maybe (Parent a)
-getStackByItem item stacks =
+getParentByChildren : String -> Dict String (Parent a) -> Maybe (Parent a)
+getParentByChildren item stacks =
     Dict.toList stacks
         |> List.filter (\( _, stack ) -> List.member item stack.children)
         |> List.map Tuple.second

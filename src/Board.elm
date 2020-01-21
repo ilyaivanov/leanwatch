@@ -2,7 +2,7 @@ port module Board exposing (Item, Model, Msg(..), Stack, init, onBoardsLoaded, o
 
 import Browser.Dom as Dom exposing (focus)
 import Dict exposing (Dict)
-import DictMoves exposing (Parent, moveItem, moveItemInList, moveItemToEnd)
+import DictMoves exposing (Parent, getParentByChildren, moveItem, moveItemInList, moveItemToEnd)
 import Embed.Youtube
 import Embed.Youtube.Attributes
 import ExtraEvents exposing (..)
@@ -163,6 +163,7 @@ type Msg
     | OnCreateNewBoard
     | CreateNewBoard String
     | RemoveBoard String
+    | RemoveStack String
     | StartModifyingItem { itemId : String, newName : String }
     | OnNewNameEnter String
     | ApplyModification
@@ -327,7 +328,13 @@ update msg model =
                     noComand { model | dragState = NoDrag }
 
         StackTitleMouseDown stackId { mousePosition, offsets } ->
-            noComand { model | dragState = DraggingStack mousePosition offsets stackId }
+            case model.modificationState of
+                --Ignore drag clicks during modification
+                Modifying _ ->
+                    noComand model
+
+                _ ->
+                    noComand { model | dragState = DraggingStack mousePosition offsets stackId }
 
         MouseMove newMousePosition ->
             case ( model.dragState, newMousePosition.buttons ) of
@@ -534,6 +541,18 @@ update msg model =
             in
             noComand { model | userProfile = newProfile, boards = Dict.remove boardId model.boards }
 
+        RemoveStack stackId ->
+            case getParentByChildren stackId model.boards of
+                Just board ->
+                    let
+                        newBoard =
+                            { board | children = removeItem stackId board.children }
+                    in
+                    noComand { model | boards = Dict.insert board.id newBoard model.boards }
+
+                Nothing ->
+                    noComand model
+
         Noop ->
             noComand model
 
@@ -545,13 +564,18 @@ finishModification : Model -> Model
 finishModification model =
     case model.modificationState of
         Modifying { itemId, newName } ->
-            { model | modificationState = NoModification, boards = updateBoardName model.boards itemId newName }
+            { model
+                | modificationState = NoModification
+                , boards = updateName model.boards itemId newName
+                , stacks = updateName model.stacks itemId newName
+            }
 
         NoModification ->
             model
 
 
-updateBoardName boards boardId newName =
+updateName : Dict String { a | name : String } -> String -> String -> Dict String { a | name : String }
+updateName boards boardId newName =
     Dict.update boardId (Maybe.map (\s -> { s | name = newName })) boards
 
 
@@ -641,7 +665,7 @@ viewBoard model =
                         (board.children
                             |> List.map (\stackId -> Dict.get stackId model.stacks)
                             |> ignoreNothing
-                            |> List.map (\stack -> viewStack model.dragState [ class "column-board" ] (getStackToView model stack.id))
+                            |> List.map (\stack -> viewStack model.modificationState model.dragState [ class "column-board" ] (getStackToView model stack.id))
                         )
                         [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ] ]
                     )
@@ -656,8 +680,8 @@ viewBoardBar { name } =
     div [ class "board-header" ] [ text name ]
 
 
-viewStack : DragState -> List (Attribute Msg) -> ( Stack, List Item ) -> Html Msg
-viewStack dragState attributes ( { id, name }, items ) =
+viewStack : ModificationState -> DragState -> List (Attribute Msg) -> ( Stack, List Item ) -> Html Msg
+viewStack modificationState dragState attributes ( { id, name }, items ) =
     div (List.append [ class "column-drag-overlay" ] attributes)
         [ div
             [ class "column"
@@ -665,7 +689,11 @@ viewStack dragState attributes ( { id, name }, items ) =
             , onMouseEnter (StackEnterDuringDrag id)
             ]
             [ div [ class "column-title", onMouseDown (StackTitleMouseDown id) ]
-                [ span [] [ text name ]
+                [ viewContent modificationState { id = id, name = name }
+                , div [ class "column-title-actions" ]
+                    [ button [ onMouseDownAlwaysStopPropagation (StartModifyingItem { itemId = id, newName = name }) ] [ text "E" ]
+                    , button [ onMouseDownAlwaysStopPropagation (RemoveStack id) ] [ text "X" ]
+                    ]
                 ]
             , div [ class "column-content" ]
                 (if List.isEmpty items then
@@ -794,7 +822,8 @@ viewElementBeingDragged model =
                 ( stack, items ) =
                     getStackToView model stackId
             in
-            viewStack NoDrag
+            viewStack NoModification
+                NoDrag
                 [ class "item-dragged"
                 , style "left" (String.fromInt (mouseMoveEvent.pageX - offsets.offsetX) ++ "px")
                 , style "top" (String.fromInt (mouseMoveEvent.pageY - offsets.offsetY) ++ "px")
