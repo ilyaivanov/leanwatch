@@ -7,23 +7,41 @@ function registerPorts(ports) {
       , email: "42",
     });
     ports.onUserProfileLoaded.send({
+      id: "USER_1",
       selectedBoard: "BOARD_1",
-      boards: [{id: 'BOARD_1', name: "First Board"}],
+      boards: ['BOARD_1', 'BOARD_2', 'BOARD_3'],
+      syncTime: 1000 * 60
     });
-  }, 200);
 
-  ports.loadBoard.subscribe(function (boardId) {
-    ports.onBoardLoaded.send(boards[boardId]);
-  });
+    setTimeout(() => {
+      ports.onBoardsLoaded.send(boards);
+    }, 200);
+  }, 200);
 
   ports.saveBoard.subscribe(function (board) {
     console.log('saving board', board);
   });
+
+  ports.saveProfile.subscribe(function (userProfile) {
+    console.log('saving userProfile', userProfile);
+  });
+
+  ports.createBoard.subscribe(function () {
+    ports.onBoardCreated.send({id: Math.random() + "", name: "New Board", stacks: []});
+  });
+
 }
 
-const boards = {
-  "BOARD_1": {
-    id:'BOARD_1',
+const boards = [
+  {...createDummyBoard()},
+  {...createDummyBoard(), id: "BOARD_2", name: "Second Board"},
+  {...createDummyBoard(), id: "BOARD_3", name: "Third Board"},
+];
+
+
+function createDummyBoard() {
+  return {
+    id: 'BOARD_1',
     name: "First Board",
     stacks: [
       {
@@ -38,5 +56,5 @@ const boards = {
         ],
       },
     ],
-  },
-};
+  };
+}

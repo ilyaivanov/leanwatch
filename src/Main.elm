@@ -3,7 +3,6 @@ module Main exposing (main)
 import Board as Board
 import Browser exposing (Document)
 import Browser.Navigation as Nav
-import Dict exposing (Dict)
 import Html exposing (Attribute, Html, div, text)
 import Login as Login
 import Url exposing (Url)
@@ -95,7 +94,8 @@ subscriptions model =
         [ Login.onLogin Login.OnLogin |> Sub.map LoginMsg
         , Login.onLogout Login.OnLogout |> Sub.map LoginMsg
         , Board.onUserProfileLoaded Board.UserProfileLoaded |> Sub.map BoardMsg
-        , Board.onBoardLoaded Board.BoardLoaded |> Sub.map BoardMsg
+        , Board.onBoardsLoaded Board.BoardsLoaded |> Sub.map BoardMsg
+        , Board.onBoardCreated Board.OnBoardCreated |> Sub.map BoardMsg
         ]
 
 

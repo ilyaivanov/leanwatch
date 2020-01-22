@@ -1,5 +1,5 @@
 const auth = firebase.auth();
-const firestore = firebase.firestore();
+const db = firebase.firestore();
 
 function registerPorts(ports) {
   const provider = new firebase.auth.GoogleAuthProvider();
@@ -7,46 +7,73 @@ function registerPorts(ports) {
   auth.onAuthStateChanged(function (user) {
     if (user) {
       ports.onLogin.send(user);
-      handleUserLogin(user, userProfile => ports.onUserProfileLoaded.send(userProfile));
+      handleUserLogin(user, userProfile => {
+        ports.onUserProfileLoaded.send(userProfile);
+        db.collection('boards').where('id', 'in', userProfile.boards).get().then(snapshot => {
+          ports.onBoardsLoaded.send(snapshot.docs.map(d => d.data()));
+        });
+      });
     } else
       ports.onLogout.send("ignored value");
   });
 
   ports.googleSignin.subscribe(() => auth.signInWithPopup(provider));
+  ports.logout.subscribe(() => auth.signOut());
 
-  ports.loadBoard.subscribe(function (boardId) {
-    firestore.collection('boards').doc(boardId).get().then(snapshot => {
-      ports.onBoardLoaded.send({...snapshot.data(), id: snapshot.id});
+  ports.saveBoard.subscribe(function (boards) {
+    if (boards.length > 0) {
+      const batch = db.batch();
+      boards.forEach(board => {
+        var ref = db.collection("boards").doc(board.id);
+        batch.set(ref, board);
+      });
+      batch.commit().then(function () {
+        console.log('Saved ' + boards.length + ' boards. (' + boards.map(b => b.name).join(', ') + ')');
+      });
+    }
+  });
+
+  ports.saveProfile.subscribe(function (userProfile) {
+    db.collection('users').doc(userProfile.id).set(userProfile).then(() => {
+      console.log('Saved user profile', userProfile);
     });
   });
 
-  ports.saveBoard.subscribe(function (board) {
-    console.log('saving board', board);
-    firestore.collection('boards').doc(board.id).set(board).then(snapshot => {
-      console.log('Board ' + board.name + " have been saved");
-    });
+  ports.createBoard.subscribe(function () {
+    const ref = db.collection('boards').doc();
+    ports.onBoardCreated.send({id: ref.id, name: "First Board", stacks: []});
   });
+
 }
 
 function handleUserLogin(user, onSuccess) {
-  const userRef = firestore.doc('users/' + user.uid);
+  const userRef = db.doc('users/' + user.uid);
   userRef.get().then(function (snapshot) {
     if (snapshot.exists) {
-      onSuccess({id: snapshot.id, ...snapshot.data()});
+      const profile = {id: snapshot.id, ...snapshot.data()};
+      console.log('Received profile ', profile);
+      onSuccess(profile);
     } else {
-      const newBoard = firestore.collection('boards').doc();
-      newBoard.set(defaultBoard);
+      const newBoard = db.collection('boards').doc();
+      newBoard.set({...defaultBoard, id: newBoard.id});
       const newProfile = {
-        boards: [{id: newBoard.id, name: defaultBoard.name}],
+        id: userRef.id,
+        boards: [newBoard.id],
         selectedBoard: newBoard.id,
+        syncTime: 1000 * 60,
       };
+      console.log('Created profile ', newProfile);
       userRef.set(newProfile);
       onSuccess({id: userRef.id, ...newProfile});
     }
   });
 }
 
-
+// TODO: move default board creation to the backend
+// So that you can assign unique ids for items during creation
+// now this isn't a problem, but in the future you might share initial board
+// and you can move item from the initial board to your initial board. This way you will have two items with the same id
+// Probability of this is super minimal
 const defaultBoard = {
   name: "First Board",
   stacks: [

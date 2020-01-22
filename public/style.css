@@ -6,7 +6,7 @@
   --double-item-padding: 1em;
   --board-header-height: 40px;
   --top-bar-height: 40px;
-
+  --drag-cursor: pointer;
   --sidebar-width: calc(var(--item-width) + var(--double-item-padding));
   --board-width: 100vw;
   --board-width-with-sidebar: calc(
@@ -67,16 +67,30 @@ body {
   height: 40px;
   display: flex;
   align-items: center;
+  width: var(--sidebar-width);
   padding: var(--item-padding);
-  padding-left: calc(var(--item-padding) + 4px);
+  padding-left: calc(var(--item-padding));
   border-bottom: 1px lightgrey solid;
-  cursor: pointer;
+  cursor: var(--drag-cursor);
+  position: relative;
+}
+.sidebar-boards-button-actions{
+  display: none;
+  flex-direction: row;
+  position: absolute;
+  right: 0;
+}
+.sidebar-boards-button:hover .sidebar-boards-button-actions{
+  display: flex;
+}
+
+.sidebar-boards-button:hover.item-preview .sidebar-boards-button-actions{
+  display: none;
 }
 
 .sidebar-boards-button.active {
   background-color: rgba(0, 0, 0, 0.2);
   padding-left: calc(var(--item-padding));
-  border-left: 4px white solid;
 }
 
 /* BOARD and STACKS */
@@ -113,10 +127,11 @@ body {
 }
 
 .board-during-drag {
-  cursor: grabbing;
+  --drag-cursor: grabbing;
+  cursor: var(--drag-cursor);
 }
 
-.board-during-drag .item {
+.board-during-drag button {
   cursor: inherit;
 }
 
@@ -135,8 +150,19 @@ body {
   padding: var(--item-padding);
   height: 2em;
   user-select: none;
-  cursor: pointer;
+  cursor: var(--drag-cursor);
+  position: relative;
   /* background-color: rgb(234, 253, 205); */
+}
+.column-title-actions{
+  display: none;
+  flex-direction: row;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+.column-title:hover .column-title-actions{
+  display: flex;
 }
 
 .column-content {
@@ -165,7 +191,7 @@ body {
   background-color: white;
   display: flex;
   margin-top: var(--item-padding);
-  cursor: pointer;
+  cursor: var(--drag-cursor);
   position: relative;
 }
 
@@ -218,6 +244,7 @@ body {
   height: var(--top-bar-height);
   display: flex;
   justify-content: space-between;
+  align-items: center;
 }
 
 button.active {
@@ -297,7 +324,7 @@ button.active {
   display: flex;
   justify-content: center;
   align-items: center;
-  cursor: pointer;
+  cursor: var(--drag-cursor);
 }
 
 .button.flat {
