@@ -15,6 +15,7 @@ import ListUtils exposing (flipArguments, ignoreNothing, removeItem)
 import Login
 import Process
 import Random
+import Set exposing (Set)
 import Task
 
 
@@ -78,19 +79,23 @@ mergeAndNormalizeResponse boardResponse model =
     }
 
 
-denormalizeBoard : Board -> Model -> BoardResponse
-denormalizeBoard board model =
-    let
-        stacksNarrow =
-            board.children |> List.map (\id -> Dict.get id model.stacks) |> ignoreNothing
+denormalizeBoard : String -> Model -> Maybe BoardResponse
+denormalizeBoard boardId model =
+    Dict.get boardId model.boards
+        |> Maybe.map
+            (\board ->
+                let
+                    stacksNarrow =
+                        board.children |> List.map (\id -> Dict.get id model.stacks) |> ignoreNothing
 
-        stacks =
-            stacksNarrow |> List.map (\s -> { id = s.id, name = s.name, items = s.children |> List.map (\id -> Dict.get id model.items) |> ignoreNothing })
-    in
-    { id = board.id
-    , name = board.name
-    , stacks = stacks
-    }
+                    stacks =
+                        stacksNarrow |> List.map (\s -> { id = s.id, name = s.name, items = s.children |> List.map (\id -> Dict.get id model.items) |> ignoreNothing })
+                in
+                { id = board.id
+                , name = board.name
+                , stacks = stacks
+                }
+            )
 
 
 
@@ -107,7 +112,9 @@ type alias Model =
     -- UI STATE
     , sidebarState : SidebarState
     , dragState : DragState
-    , modificationState : ModificationState
+    , renamingState : RenamingState
+    , boardIdsToSync : Set String
+    , needToSyncProfile : Bool
     , searchTerm : String
 
     -- Used to debounce search on input
@@ -124,9 +131,9 @@ type DragState
     | DraggingBoard MouseMoveEvent Offsets String
 
 
-type ModificationState
-    = NoModification
-    | Modifying { itemId : String, newName : String }
+type RenamingState
+    = NoRename
+    | RenamingItem { itemId : String, newName : String }
 
 
 type SidebarState
@@ -162,7 +169,6 @@ type Msg
     | SelectBoard String
     | UserProfileLoaded UserProfile
     | BoardsLoaded (List BoardResponse)
-    | SaveSelectedBoard
     | OnCreateNewBoard
     | CreateNewBoard String
     | RemoveBoard String
@@ -172,6 +178,9 @@ type Msg
     | ApplyModification
     | OnModificationKeyUp String
     | FocusResult (Result Dom.Error ())
+      -- Backend sync
+    | SaveModifiedItemsOnDemand
+    | SaveModifiedItemsScheduled
 
 
 init : Model
@@ -184,8 +193,10 @@ init =
         , boards = []
         , id = ""
         }
+    , boardIdsToSync = Set.empty
+    , needToSyncProfile = False
     , dragState = NoDrag
-    , modificationState = NoModification
+    , renamingState = NoRename
     , searchTerm = ""
     , currentSearchId = ""
     , videoBeingPlayed = Nothing
@@ -315,6 +326,14 @@ getBoardViewModel model =
 -- UPDATE
 
 
+markSelectedBoardAsNeededToSync model =
+    { model | boardIdsToSync = Set.insert model.userProfile.selectedBoard model.boardIdsToSync }
+
+
+updateProfileAndMarkAsNeededToSync profile model =
+    { model | userProfile = profile, needToSyncProfile = True }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -333,9 +352,9 @@ update msg model =
                     noComand { model | dragState = NoDrag }
 
         StackTitleMouseDown stackId { mousePosition, offsets } ->
-            case model.modificationState of
+            case model.renamingState of
                 --Ignore drag clicks during modification
-                Modifying _ ->
+                RenamingItem _ ->
                     noComand model
 
                 _ ->
@@ -372,7 +391,7 @@ update msg model =
                         noComand model
 
                     else
-                        noComand { model | stacks = moveItem model.stacks { from = itemOver, to = itemUnder } }
+                        { model | stacks = moveItem model.stacks { from = itemOver, to = itemUnder } } |> markSelectedBoardAsNeededToSync |> noComand
 
                 _ ->
                     noComand model
@@ -380,7 +399,7 @@ update msg model =
         StackEnterDuringDrag stackUnder ->
             case model.dragState of
                 DraggingStack _ _ stackOver ->
-                    noComand { model | boards = moveItem model.boards { from = stackOver, to = stackUnder } }
+                    { model | boards = moveItem model.boards { from = stackOver, to = stackUnder } } |> markSelectedBoardAsNeededToSync |> noComand
 
                 _ ->
                     noComand model
@@ -395,7 +414,7 @@ update msg model =
                         newOrder =
                             moveItemInList model.userProfile.boards { from = boardOver, to = boardUnder }
                     in
-                    noComand { model | userProfile = { profile | boards = newOrder } }
+                    noComand (updateProfileAndMarkAsNeededToSync { profile | boards = newOrder } model)
 
                 _ ->
                     noComand model
@@ -403,20 +422,21 @@ update msg model =
         StackOverlayEnterDuringDrag stackUnder ->
             case model.dragState of
                 DraggingStack _ _ stackOver ->
-                    noComand { model | boards = moveItem model.boards { from = stackOver, to = stackUnder } }
+                    { model | boards = moveItem model.boards { from = stackOver, to = stackUnder } } |> markSelectedBoardAsNeededToSync |> noComand
 
                 DraggingItem _ _ itemOver ->
-                    noComand { model | stacks = moveItemToEnd model.stacks { itemToMove = itemOver, targetParent = stackUnder } }
+                    { model | stacks = moveItemToEnd model.stacks { itemToMove = itemOver, targetParent = stackUnder } } |> markSelectedBoardAsNeededToSync |> noComand
 
                 _ ->
                     noComand model
 
         CreateStack newStackId ->
-            noComand
-                { model
-                    | boards = updateBoard model.userProfile.selectedBoard (\b -> { b | children = List.append b.children [ newStackId ] }) model.boards
-                    , stacks = Dict.insert newStackId { id = newStackId, name = "New Stack", children = [] } model.stacks
-                }
+            { model
+                | boards = updateBoard model.userProfile.selectedBoard (\b -> { b | children = List.append b.children [ newStackId ] }) model.boards
+                , stacks = Dict.insert newStackId { id = newStackId, name = "New Stack", children = [] } model.stacks
+            }
+                |> markSelectedBoardAsNeededToSync
+                |> noComand
 
         OnSearchInput val ->
             ( { model | searchTerm = val }
@@ -442,6 +462,16 @@ update msg model =
 
             else
                 ( model, Cmd.none )
+
+        SaveModifiedItemsOnDemand ->
+            saveModifiedItems model
+
+        SaveModifiedItemsScheduled ->
+            let
+                ( newModel, cmds ) =
+                    saveModifiedItems model
+            in
+            ( newModel, Cmd.batch [ cmds, scheduleNextSync ] )
 
         GotItems response ->
             case response of
@@ -473,21 +503,13 @@ update msg model =
                     profile =
                         model.userProfile
                 in
-                ( { model | userProfile = { profile | selectedBoard = boardId } }, Cmd.none )
+                noComand (updateProfileAndMarkAsNeededToSync { profile | selectedBoard = boardId } model)
 
         UserProfileLoaded profile ->
-            ( { model | userProfile = profile }, Cmd.none )
+            ( { model | userProfile = profile }, scheduleNextSync )
 
         BoardsLoaded boards ->
             noComand (List.foldl mergeAndNormalizeResponse model boards)
-
-        SaveSelectedBoard ->
-            case Dict.get model.userProfile.selectedBoard model.boards of
-                Just actualBoard ->
-                    ( model, saveBoard (denormalizeBoard actualBoard model) )
-
-                Nothing ->
-                    noComand model
 
         OnCreateNewBoard ->
             ( model, Random.generate CreateNewBoard createId )
@@ -503,17 +525,17 @@ update msg model =
                 newBoard =
                     { id = id, name = "New Board", children = [] }
             in
-            ( { model | userProfile = newProfile, boards = Dict.insert id newBoard model.boards }, saveProfile newProfile )
+            ( { model | boards = Dict.insert id newBoard model.boards } |> updateProfileAndMarkAsNeededToSync newProfile, Cmd.none )
 
         StartModifyingItem item ->
-            ( { model | modificationState = Modifying item }, focus item.itemId |> Task.attempt FocusResult )
+            ( { model | renamingState = RenamingItem item }, focus item.itemId |> Task.attempt FocusResult )
 
         OnNewNameEnter newName ->
-            case model.modificationState of
-                Modifying mod ->
-                    ( { model | modificationState = Modifying { mod | newName = newName } }, Cmd.none )
+            case model.renamingState of
+                RenamingItem mod ->
+                    ( { model | renamingState = RenamingItem { mod | newName = newName } }, Cmd.none )
 
-                NoModification ->
+                NoRename ->
                     ( model, Cmd.none )
 
         ApplyModification ->
@@ -544,7 +566,7 @@ update msg model =
                 newProfile =
                     { profile | boards = removeItem boardId profile.boards, selectedBoard = nextSelectedBoard }
             in
-            noComand { model | userProfile = newProfile, boards = Dict.remove boardId model.boards }
+            noComand ({ model | boards = Dict.remove boardId model.boards } |> updateProfileAndMarkAsNeededToSync newProfile)
 
         RemoveStack stackId ->
             case getParentByChildren stackId model.boards of
@@ -553,7 +575,7 @@ update msg model =
                         newBoard =
                             { board | children = removeItem stackId board.children }
                     in
-                    noComand { model | boards = Dict.insert board.id newBoard model.boards }
+                    { model | boards = Dict.insert board.id newBoard model.boards } |> markSelectedBoardAsNeededToSync |> noComand
 
                 Nothing ->
                     noComand model
@@ -565,17 +587,42 @@ update msg model =
             noComand model
 
 
+oneMinute =
+    1000 * 60
+
+
+scheduleNextSync =
+    Process.sleep oneMinute |> Task.perform (always SaveModifiedItemsScheduled)
+
+
+saveModifiedItems : Model -> ( Model, Cmd Msg )
+saveModifiedItems model =
+    let
+        syncProfile =
+            if model.needToSyncProfile then
+                saveProfile model.userProfile
+
+            else
+                Cmd.none
+
+        syncBoards =
+            Set.toList model.boardIdsToSync |> List.map (\boardId -> denormalizeBoard boardId model) |> ignoreNothing |> List.map saveBoard
+    in
+    ( { model | needToSyncProfile = False, boardIdsToSync = Set.empty }, Cmd.batch [ syncProfile, Cmd.batch syncBoards ] )
+
+
 finishModification : Model -> Model
 finishModification model =
-    case model.modificationState of
-        Modifying { itemId, newName } ->
+    -- TODO: fogure out how to sync this to the backend
+    case model.renamingState of
+        RenamingItem { itemId, newName } ->
             { model
-                | modificationState = NoModification
+                | renamingState = NoRename
                 , boards = updateName model.boards itemId newName
                 , stacks = updateName model.stacks itemId newName
             }
 
-        NoModification ->
+        NoRename ->
             model
 
 
@@ -649,7 +696,7 @@ viewTopBar model login =
 viewUser : Login.LoginSuccessResponse -> Html Msg
 viewUser loginInfo =
     div [ class "user-info-container" ]
-        [ button [ onClick SaveSelectedBoard ] [ text "save" ]
+        [ button [ onClick SaveModifiedItemsOnDemand ] [ text "save" ]
         , span [] [ text loginInfo.displayName ]
         , img [ class "user-info-image", src loginInfo.photoURL ] []
         ]
@@ -670,7 +717,7 @@ viewBoard model =
                         (board.children
                             |> List.map (\stackId -> Dict.get stackId model.stacks)
                             |> ignoreNothing
-                            |> List.map (\stack -> viewStack model.modificationState model.dragState [ class "column-board" ] (getStackToView model stack.id))
+                            |> List.map (\stack -> viewStack model.renamingState model.dragState [ class "column-board" ] (getStackToView model stack.id))
                         )
                         [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ] ]
                     )
@@ -685,7 +732,7 @@ viewBoardBar { name } =
     div [ class "board-header" ] [ text name ]
 
 
-viewStack : ModificationState -> DragState -> List (Attribute Msg) -> ( Stack, List Item ) -> Html Msg
+viewStack : RenamingState -> DragState -> List (Attribute Msg) -> ( Stack, List Item ) -> Html Msg
 viewStack modificationState dragState attributes ( { id, name }, items ) =
     div (List.append [ class "column-drag-overlay" ] attributes)
         [ div
@@ -774,7 +821,7 @@ viewBoardButton model isDragging attrs item =
             ]
             attrs
         )
-        [ viewContent model.modificationState item
+        [ viewContent model.renamingState item
         , div [ class "sidebar-boards-button-actions" ]
             [ button [ onClickAlwaysStopPropagation (StartModifyingItem { itemId = item.id, newName = item.name }) ] [ text "E" ]
             , button [ onClickAlwaysStopPropagation (RemoveBoard item.id) ] [ text "X" ]
@@ -784,14 +831,14 @@ viewBoardButton model isDragging attrs item =
 
 viewContent modificationState { name, id } =
     case modificationState of
-        Modifying { itemId, newName } ->
+        RenamingItem { itemId, newName } ->
             if itemId == id then
                 input [ onBlur ApplyModification, Attributes.id id, value newName, onInput OnNewNameEnter, onKeyUp OnModificationKeyUp ] []
 
             else
                 text name
 
-        NoModification ->
+        NoRename ->
             text name
 
 
@@ -827,7 +874,7 @@ viewElementBeingDragged model =
                 ( stack, items ) =
                     getStackToView model stackId
             in
-            viewStack NoModification
+            viewStack NoRename
                 NoDrag
                 [ class "item-dragged"
                 , style "left" (String.fromInt (mouseMoveEvent.pageX - offsets.offsetX) ++ "px")
