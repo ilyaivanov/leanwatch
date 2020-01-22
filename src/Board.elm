@@ -11,7 +11,7 @@ import Html.Attributes as Attributes exposing (..)
 import Html.Events exposing (onBlur, onClick, onInput)
 import Http
 import Json.Decode as Json
-import ListUtils exposing (flipArguments, ignoreNothing, removeItem)
+import ListUtils exposing (flip, removeItem, unpackMaybes)
 import Login
 import Process
 import Random
@@ -92,10 +92,10 @@ denormalizeBoard boardId model =
             (\board ->
                 let
                     stacksNarrow =
-                        board.children |> List.map (\id -> Dict.get id model.stacks) |> ignoreNothing
+                        board.children |> List.map (\id -> Dict.get id model.stacks) |> unpackMaybes
 
                     stacks =
-                        stacksNarrow |> List.map (\s -> { id = s.id, name = s.name, items = s.children |> List.map (\id -> Dict.get id model.items) |> ignoreNothing })
+                        stacksNarrow |> List.map (\s -> { id = s.id, name = s.name, items = s.children |> List.map (\id -> Dict.get id model.items) |> unpackMaybes })
                 in
                 { id = board.id
                 , name = board.name
@@ -271,8 +271,8 @@ isDraggingAnyBoard dragState =
             False
 
 
-isDraggingItem : DragState -> Item -> Bool
-isDraggingItem dragState { id } =
+isDraggingItem : DragState -> String -> Bool
+isDraggingItem dragState id =
     case dragState of
         DraggingItem _ _ itemBeingDragged ->
             itemBeingDragged == id
@@ -299,13 +299,14 @@ getSearchStack model =
     model.stacks |> Dict.get "SEARCH"
 
 
+getStackToView : Model -> String -> ( Stack, List Item )
 getStackToView model stackId =
     let
         stack =
             getStack stackId model.stacks
 
         items =
-            stack.children |> List.map (\itemId -> Dict.get itemId model.items) |> ignoreNothing
+            stack.children |> List.map (\itemId -> Dict.get itemId model.items) |> unpackMaybes
     in
     ( stack, items )
 
@@ -609,7 +610,7 @@ saveModifiedItems model =
                 Cmd.none
 
         syncBoards =
-            Set.toList model.boardIdsToSync |> List.map (\boardId -> denormalizeBoard boardId model) |> ignoreNothing |> saveBoard
+            Set.toList model.boardIdsToSync |> List.map (\boardId -> denormalizeBoard boardId model) |> unpackMaybes |> saveBoard
     in
     ( { model | needToSyncProfile = False, boardIdsToSync = Set.empty }, Cmd.batch [ syncProfile, syncBoards ] )
 
@@ -719,7 +720,7 @@ viewBoard model =
                     (List.append
                         (board.children
                             |> List.map (\stackId -> Dict.get stackId model.stacks)
-                            |> ignoreNothing
+                            |> unpackMaybes
                             |> List.map (\stack -> viewStack model.renamingState model.dragState [ class "column-board" ] (getStackToView model stack.id))
                         )
                         [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ] ]
@@ -755,7 +756,7 @@ viewStack modificationState dragState attributes ( { id, name }, items ) =
                     [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag id) ] [] ]
 
                  else
-                    List.map (\item -> viewItem [] (isDraggingItem dragState item) item) items
+                    List.map (\item -> viewItem [] dragState item) items
                 )
             ]
         , div [ class "column-footer", onMouseEnter (StackOverlayEnterDuringDrag id) ] []
@@ -785,14 +786,14 @@ viewSearch model =
         items =
             case stackM of
                 Just stack ->
-                    stack.children |> List.map (\itemId -> Dict.get itemId model.items) |> ignoreNothing
+                    stack.children |> List.map (\itemId -> Dict.get itemId model.items) |> unpackMaybes
 
                 Nothing ->
                     []
     in
     [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick (SetSidebar Hidden) ] [ text "<" ] ]
     , input [ onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
-    , div [] (List.map (\item -> viewItem [] (isDraggingItem model.dragState item) item) items)
+    , div [] (List.map (\item -> viewItem [] model.dragState item) items)
     ]
 
 
@@ -803,16 +804,16 @@ viewBoards model =
         ]
     , div []
         (model.userProfile.boards
-            |> List.map (flipArguments Dict.get model.boards)
-            |> ignoreNothing
-            |> List.map (\item -> viewBoardButton model (isDraggingBoard model.dragState item.id) [] item)
+            |> List.map (flip Dict.get model.boards)
+            |> unpackMaybes
+            |> List.map (\item -> viewBoardButton model [] item)
         )
     , div [] [ button [ onClick CreateNewBoard ] [ text "Add" ] ]
     ]
 
 
-viewBoardButton : Model -> Bool -> List (Attribute Msg) -> Board -> Html Msg
-viewBoardButton model isDragging attrs item =
+viewBoardButton : Model -> List (Attribute Msg) -> Board -> Html Msg
+viewBoardButton model attrs item =
     div
         (List.append
             [ class "sidebar-boards-button"
@@ -820,7 +821,7 @@ viewBoardButton model isDragging attrs item =
             , onClickIf (not (isDraggingAnyBoard model.dragState)) (SelectBoard item.id)
             , onMouseDown (BoardMouseDown item.id)
             , onMouseEnter (BoardEnterDuringDrag item.id)
-            , classIf isDragging "item-preview"
+            , classIf (isDraggingBoard model.dragState item.id) "item-preview"
             ]
             attrs
         )
@@ -845,12 +846,12 @@ viewContent modificationState { name, id } =
             text name
 
 
-viewItem : List (Attribute Msg) -> Bool -> Item -> Html Msg
-viewItem atts isDragging { id, name, youtubeId } =
+viewItem : List (Attribute Msg) -> DragState -> Item -> Html Msg
+viewItem atts dragState { id, name, youtubeId } =
     div
         (List.append
             [ class "item"
-            , classIf isDragging "item-preview"
+            , classIf (isDraggingItem dragState id) "item-preview"
             ]
             atts
         )
@@ -862,50 +863,30 @@ viewItem atts isDragging { id, name, youtubeId } =
 
 
 viewElementBeingDragged model =
+    let
+        getAttributes : MouseMoveEvent -> Offsets -> List (Attribute msg)
+        getAttributes mouseMoveEvent offsets =
+            [ class "item-dragged"
+            , style "left" (String.fromInt (mouseMoveEvent.pageX - offsets.offsetX) ++ "px")
+            , style "top" (String.fromInt (mouseMoveEvent.pageY - offsets.offsetY) ++ "px")
+            ]
+    in
     case model.dragState of
         DraggingItem mouseMoveEvent offsets itemId ->
-            viewItem
-                [ class "item-dragged"
-                , style "left" (String.fromInt (mouseMoveEvent.pageX - offsets.offsetX) ++ "px")
-                , style "top" (String.fromInt (mouseMoveEvent.pageY - offsets.offsetY) ++ "px")
-                ]
-                False
-                (model.items |> Dict.get itemId |> Maybe.withDefault (Item "1" "1" "1"))
+            Dict.get itemId model.items
+                |> Maybe.map (viewItem (getAttributes mouseMoveEvent offsets) NoDrag)
+                |> Maybe.withDefault (div [] [])
 
         DraggingStack mouseMoveEvent offsets stackId ->
-            let
-                ( stack, items ) =
-                    getStackToView model stackId
-            in
-            viewStack NoRename
-                NoDrag
-                [ class "item-dragged"
-                , style "left" (String.fromInt (mouseMoveEvent.pageX - offsets.offsetX) ++ "px")
-                , style "top" (String.fromInt (mouseMoveEvent.pageY - offsets.offsetY) ++ "px")
-                ]
-                ( stack, items )
+            viewStack NoRename NoDrag (getAttributes mouseMoveEvent offsets) (getStackToView model stackId)
 
         DraggingBoard mouseMoveEvent offsets boardId ->
-            case model.boards |> Dict.get boardId of
-                Just actualBoard ->
-                    viewBoardButton model
-                        False
-                        [ class "item-dragged"
-                        , style "left" (String.fromInt (mouseMoveEvent.pageX - offsets.offsetX) ++ "px")
-                        , style "top" (String.fromInt (mouseMoveEvent.pageY - offsets.offsetY) ++ "px")
-                        ]
-                        actualBoard
+            model.boards
+                |> Dict.get boardId
+                |> Maybe.map (viewBoardButton model (getAttributes mouseMoveEvent offsets))
+                |> Maybe.withDefault (div [] [])
 
-                Nothing ->
-                    div [] []
-
-        NoDrag ->
-            div [] []
-
-        ItemPressedNotYetMoved _ _ _ ->
-            div [] []
-
-        BoardPressedNotYetMoved _ _ _ ->
+        _ ->
             div [] []
 
 
