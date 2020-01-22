@@ -39,6 +39,9 @@ port saveProfile : UserProfile -> Cmd msg
 port createBoard : () -> Cmd msg
 
 
+port logout : () -> Cmd msg
+
+
 port onBoardCreated : (BoardResponse -> msg) -> Sub msg
 
 
@@ -187,6 +190,8 @@ type Msg
       -- Backend sync
     | SaveModifiedItemsOnDemand
     | SaveModifiedItemsScheduled
+      -- Login
+    | Logout
 
 
 init : Model
@@ -587,6 +592,9 @@ update msg model =
         Noop ->
             noComand model
 
+        Logout ->
+            ( model, logout () )
+
         FocusResult _ ->
             noComand model
 
@@ -693,6 +701,7 @@ viewTopBar model login =
             [ button [ classIf (model.sidebarState == Boards) "active", onClick (SetSidebar Boards) ] [ text "boards" ]
             , button [ classIf (model.sidebarState == Search) "active", onClick (SetSidebar Search) ] [ text "search" ]
             ]
+        , button [ onClick SaveModifiedItemsOnDemand ] [ text "save" ]
         , Maybe.map viewUser login |> Maybe.withDefault (div [] [])
         ]
 
@@ -700,7 +709,7 @@ viewTopBar model login =
 viewUser : Login.LoginSuccessResponse -> Html Msg
 viewUser loginInfo =
     div [ class "user-info-container" ]
-        [ button [ onClick SaveModifiedItemsOnDemand ] [ text "save" ]
+        [ button [ onClick Logout ] [ text "logout" ]
         , span [] [ text loginInfo.displayName ]
         , img [ class "user-info-image", src loginInfo.photoURL ] []
         ]

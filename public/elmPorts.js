@@ -18,6 +18,7 @@ function registerPorts(ports) {
   });
 
   ports.googleSignin.subscribe(() => auth.signInWithPopup(provider));
+  ports.logout.subscribe(() => auth.signOut());
 
   ports.saveBoard.subscribe(function (boards) {
     if (boards.length > 0) {
@@ -27,7 +28,7 @@ function registerPorts(ports) {
         batch.set(ref, board);
       });
       batch.commit().then(function () {
-        console.log('Saved ' + boards.length + ' boards');
+        console.log('Saved ' + boards.length + ' boards. (' + boards.map(b => b.name).join(', ') + ')');
       });
     }
   });

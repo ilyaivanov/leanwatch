@@ -244,6 +244,7 @@ body {
   height: var(--top-bar-height);
   display: flex;
   justify-content: space-between;
+  align-items: center;
 }
 
 button.active {
