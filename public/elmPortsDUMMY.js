@@ -7,6 +7,7 @@ function registerPorts(ports) {
       , email: "42",
     });
     ports.onUserProfileLoaded.send({
+      id:"USER_1",
       selectedBoard: "BOARD_1",
       boards: ['BOARD_1', 'BOARD_2', 'BOARD_3'],
     });
@@ -18,6 +19,10 @@ function registerPorts(ports) {
 
   ports.saveBoard.subscribe(function (board) {
     console.log('saving board', board);
+  });
+
+  ports.saveProfile.subscribe(function (userProfile) {
+    console.log('saving userProfile', userProfile);
   });
 }
 

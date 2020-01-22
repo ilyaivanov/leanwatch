@@ -32,6 +32,9 @@ port onBoardsLoaded : (List BoardResponse -> msg) -> Sub msg
 port saveBoard : BoardResponse -> Cmd msg
 
 
+port saveProfile : UserProfile -> Cmd msg
+
+
 
 -- NORMALIZATION to extract
 
@@ -179,6 +182,7 @@ init =
     , userProfile =
         { selectedBoard = ""
         , boards = []
+        , id = ""
         }
     , dragState = NoDrag
     , modificationState = NoModification
@@ -202,7 +206,8 @@ type alias Stack =
 
 
 type alias UserProfile =
-    { boards : List String
+    { id : String
+    , boards : List String
     , selectedBoard : String
     }
 
@@ -498,7 +503,7 @@ update msg model =
                 newBoard =
                     { id = id, name = "New Board", children = [] }
             in
-            ( { model | userProfile = newProfile, boards = Dict.insert id newBoard model.boards }, Cmd.none )
+            ( { model | userProfile = newProfile, boards = Dict.insert id newBoard model.boards }, saveProfile newProfile )
 
         StartModifyingItem item ->
             ( { model | modificationState = Modifying item }, focus item.itemId |> Task.attempt FocusResult )
