@@ -3,8 +3,6 @@ port module Board exposing (Item, Model, Msg(..), Stack, createBoard, init, onBo
 import Browser.Dom as Dom exposing (focus)
 import Dict exposing (Dict)
 import DictMoves exposing (Parent, getParentByChildren, moveItem, moveItemInList, moveItemToEnd)
-import Embed.Youtube
-import Embed.Youtube.Attributes
 import ExtraEvents exposing (..)
 import Html exposing (..)
 import Html.Attributes as Attributes exposing (..)
@@ -911,14 +909,17 @@ viewPlayer model =
             case item of
                 Just actualItem ->
                     div [ class "player-container" ]
-                        [ Embed.Youtube.fromString actualItem.youtubeId
-                            |> Embed.Youtube.attributes
-                                [ Embed.Youtube.Attributes.width 400
-                                , Embed.Youtube.Attributes.height 150
-                                , Embed.Youtube.Attributes.autoplay
-                                , Embed.Youtube.Attributes.modestBranding
-                                ]
-                            |> Embed.Youtube.toHtml
+                        [ iframe
+                            [ width 400
+                            , height 150
+                            , src ("https://www.youtube.com/embed/" ++ actualItem.youtubeId ++ "?autoplay=1")
+                            , attribute "frameborder" "0"
+                            , attribute "allowfullscreen" "true"
+                            , attribute "modestBranding" "1"
+                            , attribute "showinfo" "1"
+                            , attribute "allow" "accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                            ]
+                            []
                         ]
 
                 Nothing ->
