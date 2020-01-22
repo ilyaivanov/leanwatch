@@ -194,6 +194,10 @@ type Msg
     | Logout
 
 
+oneMinute =
+    1000 * 60
+
+
 init : Model
 init =
     { stacks = Dict.empty
@@ -203,6 +207,7 @@ init =
         { selectedBoard = ""
         , boards = []
         , id = ""
+        , syncTime = oneMinute
         }
     , boardIdsToSync = Set.empty
     , needToSyncProfile = False
@@ -231,6 +236,7 @@ type alias UserProfile =
     { id : String
     , boards : List String
     , selectedBoard : String
+    , syncTime : Float
     }
 
 
@@ -483,7 +489,7 @@ update msg model =
                 ( newModel, cmds ) =
                     saveModifiedItems model
             in
-            ( newModel, Cmd.batch [ cmds, scheduleNextSync ] )
+            ( newModel, Cmd.batch [ cmds, scheduleNextSync model.userProfile.syncTime ] )
 
         GotItems response ->
             case response of
@@ -518,7 +524,7 @@ update msg model =
                 noComand (updateProfileAndMarkAsNeededToSync { profile | selectedBoard = boardId } model)
 
         UserProfileLoaded profile ->
-            ( { model | userProfile = profile }, scheduleNextSync )
+            ( { model | userProfile = profile }, scheduleNextSync model.userProfile.syncTime )
 
         BoardsLoaded boards ->
             noComand (List.foldl mergeAndNormalizeResponse model boards)
@@ -599,12 +605,8 @@ update msg model =
             noComand model
 
 
-oneMinute =
-    1000 * 60
-
-
-scheduleNextSync =
-    Process.sleep oneMinute |> Task.perform (always SaveModifiedItemsScheduled)
+scheduleNextSync time =
+    Process.sleep time |> Task.perform (always SaveModifiedItemsScheduled)
 
 
 saveModifiedItems : Model -> ( Model, Cmd Msg )

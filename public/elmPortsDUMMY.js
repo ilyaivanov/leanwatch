@@ -10,6 +10,7 @@ function registerPorts(ports) {
       id: "USER_1",
       selectedBoard: "BOARD_1",
       boards: ['BOARD_1', 'BOARD_2', 'BOARD_3'],
+      syncTime: 1000 * 60
     });
 
     setTimeout(() => {

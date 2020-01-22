@@ -50,7 +50,9 @@ function handleUserLogin(user, onSuccess) {
   const userRef = db.doc('users/' + user.uid);
   userRef.get().then(function (snapshot) {
     if (snapshot.exists) {
-      onSuccess({id: snapshot.id, ...snapshot.data()});
+      const profile = {id: snapshot.id, ...snapshot.data()};
+      console.log('Received profile ', profile);
+      onSuccess(profile);
     } else {
       const newBoard = db.collection('boards').doc();
       newBoard.set({...defaultBoard, id: newBoard.id});
@@ -58,7 +60,9 @@ function handleUserLogin(user, onSuccess) {
         id: userRef.id,
         boards: [newBoard.id],
         selectedBoard: newBoard.id,
+        syncTime: 1000 * 60,
       };
+      console.log('Created profile ', newProfile);
       userRef.set(newProfile);
       onSuccess({id: userRef.id, ...newProfile});
     }
