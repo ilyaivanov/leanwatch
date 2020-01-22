@@ -37,7 +37,7 @@ onMouseDown tagger =
 
 onMouseDownAlwaysStopPropagation : msg -> Attribute msg
 onMouseDownAlwaysStopPropagation msg =
-    on "mousedown" (Json.succeed msg)
+    stopPropagationOn "mousedown" (Json.map alwaysStop (Json.succeed msg))
 
 
 onMouseUp : msg -> Attribute msg
