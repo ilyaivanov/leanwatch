@@ -1,4 +1,4 @@
-port module Board exposing (Item, Model, Msg(..), Stack, init, onBoardsLoaded, onUserProfileLoaded, update, view)
+port module Board exposing (Item, Model, Msg(..), Stack, createBoard, init, onBoardCreated, onBoardsLoaded, onUserProfileLoaded, update, view)
 
 import Browser.Dom as Dom exposing (focus)
 import Dict exposing (Dict)
@@ -30,10 +30,16 @@ port onUserProfileLoaded : (UserProfile -> msg) -> Sub msg
 port onBoardsLoaded : (List BoardResponse -> msg) -> Sub msg
 
 
-port saveBoard : BoardResponse -> Cmd msg
+port saveBoard : List BoardResponse -> Cmd msg
 
 
 port saveProfile : UserProfile -> Cmd msg
+
+
+port createBoard : () -> Cmd msg
+
+
+port onBoardCreated : (BoardResponse -> msg) -> Sub msg
 
 
 
@@ -169,8 +175,8 @@ type Msg
     | SelectBoard String
     | UserProfileLoaded UserProfile
     | BoardsLoaded (List BoardResponse)
-    | OnCreateNewBoard
-    | CreateNewBoard String
+    | OnBoardCreated BoardResponse
+    | CreateNewBoard
     | RemoveBoard String
     | RemoveStack String
     | StartModifyingItem { itemId : String, newName : String }
@@ -511,21 +517,18 @@ update msg model =
         BoardsLoaded boards ->
             noComand (List.foldl mergeAndNormalizeResponse model boards)
 
-        OnCreateNewBoard ->
-            ( model, Random.generate CreateNewBoard createId )
+        CreateNewBoard ->
+            ( model, createBoard () )
 
-        CreateNewBoard id ->
+        OnBoardCreated boardResponse ->
             let
                 profile =
                     model.userProfile
 
                 newProfile =
-                    { profile | selectedBoard = id, boards = profile.boards ++ [ id ] }
-
-                newBoard =
-                    { id = id, name = "New Board", children = [] }
+                    { profile | selectedBoard = boardResponse.id, boards = profile.boards ++ [ boardResponse.id ] }
             in
-            ( { model | boards = Dict.insert id newBoard model.boards } |> updateProfileAndMarkAsNeededToSync newProfile, Cmd.none )
+            ( mergeAndNormalizeResponse boardResponse model |> updateProfileAndMarkAsNeededToSync newProfile, Cmd.none )
 
         StartModifyingItem item ->
             ( { model | renamingState = RenamingItem item }, focus item.itemId |> Task.attempt FocusResult )
@@ -606,9 +609,9 @@ saveModifiedItems model =
                 Cmd.none
 
         syncBoards =
-            Set.toList model.boardIdsToSync |> List.map (\boardId -> denormalizeBoard boardId model) |> ignoreNothing |> List.map saveBoard
+            Set.toList model.boardIdsToSync |> List.map (\boardId -> denormalizeBoard boardId model) |> ignoreNothing |> saveBoard
     in
-    ( { model | needToSyncProfile = False, boardIdsToSync = Set.empty }, Cmd.batch [ syncProfile, Cmd.batch syncBoards ] )
+    ( { model | needToSyncProfile = False, boardIdsToSync = Set.empty }, Cmd.batch [ syncProfile, syncBoards ] )
 
 
 finishModification : Model -> Model
@@ -804,7 +807,7 @@ viewBoards model =
             |> ignoreNothing
             |> List.map (\item -> viewBoardButton model (isDraggingBoard model.dragState item.id) [] item)
         )
-    , div [] [ button [ onClick OnCreateNewBoard ] [ text "Add" ] ]
+    , div [] [ button [ onClick CreateNewBoard ] [ text "Add" ] ]
     ]
 
 

@@ -7,14 +7,14 @@ function registerPorts(ports) {
       , email: "42",
     });
     ports.onUserProfileLoaded.send({
-      id:"USER_1",
+      id: "USER_1",
       selectedBoard: "BOARD_1",
       boards: ['BOARD_1', 'BOARD_2', 'BOARD_3'],
     });
 
     setTimeout(() => {
       ports.onBoardsLoaded.send(boards);
-    }, 200)
+    }, 200);
   }, 200);
 
   ports.saveBoard.subscribe(function (board) {
@@ -24,6 +24,11 @@ function registerPorts(ports) {
   ports.saveProfile.subscribe(function (userProfile) {
     console.log('saving userProfile', userProfile);
   });
+
+  ports.createBoard.subscribe(function () {
+    ports.onBoardCreated.send({id: Math.random() + "", name: "New Board", stacks: []});
+  });
+
 }
 
 const boards = [

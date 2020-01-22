@@ -1,5 +1,5 @@
 const auth = firebase.auth();
-const firestore = firebase.firestore();
+const db = firebase.firestore();
 
 function registerPorts(ports) {
   const provider = new firebase.auth.GoogleAuthProvider();
@@ -9,7 +9,7 @@ function registerPorts(ports) {
       ports.onLogin.send(user);
       handleUserLogin(user, userProfile => {
         ports.onUserProfileLoaded.send(userProfile);
-        firestore.collection('boards').where('id', 'in', userProfile.boards).get().then(snapshot => {
+        db.collection('boards').where('id', 'in', userProfile.boards).get().then(snapshot => {
           ports.onBoardsLoaded.send(snapshot.docs.map(d => d.data()));
         });
       });
@@ -19,21 +19,39 @@ function registerPorts(ports) {
 
   ports.googleSignin.subscribe(() => auth.signInWithPopup(provider));
 
-  ports.saveBoard.subscribe(function (board, userProfile) {
-    console.log(userProfile);
-    firestore.collection('boards').doc(board.id).set(board).then(snapshot => {
-      console.log('Board ' + board.name + " have been saved");
+  ports.saveBoard.subscribe(function (boards) {
+    if (boards.length > 0) {
+      const batch = db.batch();
+      boards.forEach(board => {
+        var ref = db.collection("boards").doc(board.id);
+        batch.set(ref, board);
+      });
+      batch.commit().then(function () {
+        console.log('Saved ' + boards.length + ' boards');
+      });
+    }
+  });
+
+  ports.saveProfile.subscribe(function (userProfile) {
+    db.collection('users').doc(userProfile.id).set(userProfile).then(() => {
+      console.log('Saved user profile', userProfile);
     });
   });
+
+  ports.createBoard.subscribe(function () {
+    const ref = db.collection('boards').doc();
+    ports.onBoardCreated.send({id: ref.id, name: "First Board", stacks: []});
+  });
+
 }
 
 function handleUserLogin(user, onSuccess) {
-  const userRef = firestore.doc('users/' + user.uid);
+  const userRef = db.doc('users/' + user.uid);
   userRef.get().then(function (snapshot) {
     if (snapshot.exists) {
       onSuccess({id: snapshot.id, ...snapshot.data()});
     } else {
-      const newBoard = firestore.collection('boards').doc();
+      const newBoard = db.collection('boards').doc();
       newBoard.set({...defaultBoard, id: newBoard.id});
       const newProfile = {
         id: userRef.id,

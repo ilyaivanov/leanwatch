@@ -95,6 +95,7 @@ subscriptions model =
         , Login.onLogout Login.OnLogout |> Sub.map LoginMsg
         , Board.onUserProfileLoaded Board.UserProfileLoaded |> Sub.map BoardMsg
         , Board.onBoardsLoaded Board.BoardsLoaded |> Sub.map BoardMsg
+        , Board.onBoardCreated Board.OnBoardCreated |> Sub.map BoardMsg
         ]
 
 
