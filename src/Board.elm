@@ -214,7 +214,7 @@ init =
     , searchTerm = ""
     , currentSearchId = ""
     , videoBeingPlayed = Nothing
-    , sidebarState = Boards
+    , sidebarState = Search
     }
 
 
@@ -741,7 +741,7 @@ viewBoard model =
 
 viewBoardBar : Board -> Html Msg
 viewBoardBar { name } =
-    div [ class "board-header" ] [ text name ]
+    div [ class "board-title" ] [ text name ]
 
 
 viewStack : RenamingState -> DragState -> List (Attribute Msg) -> ( Stack, List Item ) -> Html Msg
@@ -755,8 +755,8 @@ viewStack modificationState dragState attributes ( { id, name }, items ) =
             [ div [ class "column-title", onMouseDown (StackTitleMouseDown id) ]
                 [ viewContent modificationState { id = id, name = name }
                 , div [ class "column-title-actions" ]
-                    [ button [ onMouseDownAlwaysStopPropagation (StartModifyingItem { itemId = id, newName = name }) ] [ text "E" ]
-                    , button [ onMouseDownAlwaysStopPropagation (RemoveStack id) ] [ text "X" ]
+                    [ button [ onMouseDownAlwaysStopPropagation (StartModifyingItem { itemId = id, newName = name }), class "icon-button" ] [ img [ src "/icons/edit.svg" ] [] ]
+                    , button [ onMouseDownAlwaysStopPropagation (RemoveStack id), class "icon-button" ] [ img [ src "/icons/delete.svg" ] [] ]
                     ]
                 ]
             , div [ class "column-content" ]
@@ -836,11 +836,9 @@ viewBoardButton model attrs item =
         [ viewContent model.renamingState item
         , div [ class "sidebar-boards-button-actions" ]
             [ button [ onClickAlwaysStopPropagation (StartModifyingItem { itemId = item.id, newName = item.name }), class "icon-button" ]
-                [ img [ src "/icons/edit.svg" ] []
-                ]
+                [ img [ src "/icons/edit.svg" ] [] ]
             , button [ onClickAlwaysStopPropagation (RemoveBoard item.id), class "icon-button" ]
-                [ img [ src "/icons/delete.svg" ] []
-                ]
+                [ img [ src "/icons/delete.svg" ] [] ]
             ]
         ]
 

@@ -5,7 +5,7 @@
     --item-padding: 14px;
     --double-item-padding: 28px;
 
-    --board-header-height: 40px;
+    --board-header-height: 48px;
     --top-bar-height: 40px;
     --drag-cursor: pointer;
     --sidebar-width: calc(var(--item-width) + var(--double-item-padding));
@@ -174,9 +174,11 @@ button.dark:active{
     height: var(--column-container-height);
 }
 
-.board-header {
+.board-title {
     height: var(--board-header-height);
     padding: var(--item-padding);
+    font-weight: bold;
+    color: white;
 }
 
 .board-during-drag {
@@ -215,7 +217,7 @@ button.dark:active{
     flex-direction: row;
     position: absolute;
     right: 0;
-    top: 0;
+    top: 8px;
 }
 
 .column-title:hover .column-title-actions {
