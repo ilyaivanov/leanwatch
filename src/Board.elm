@@ -800,7 +800,7 @@ viewSearch model =
                     []
     in
     [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick (SetSidebar Hidden), class "icon-button" ] [ img [ src "/icons/chevron.svg" ] [] ] ]
-    , input [ onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
+    , input [ class "sidebar-search-input", onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
     , div [] (List.map (\item -> viewItem [] model.dragState item) items)
     ]
 

@@ -1,7 +1,7 @@
 :root {
     font-family: Helvetica, Arial, sans-serif;
     user-select: none;
-    --item-width: 300px;
+    --item-width: 280px;
     --item-padding: 14px;
     --double-item-padding: 28px;
 
@@ -130,6 +130,15 @@ button.dark:active{
     display: none;
 }
 
+.sidebar-search-input{
+    width: 100%;
+    height: 32px;
+    padding: 4px;
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+
 
 
 /* BOARD and STACKS */
@@ -226,18 +235,22 @@ button.dark:active{
 /* CARDS */
 
 .item {
-    height: 50px;
+    height: 48px;
     width: var(--item-width);
     background-color: white;
     display: flex;
     margin-top: var(--item-padding);
     cursor: var(--drag-cursor);
     position: relative;
+    border-radius: 4px;
+    box-shadow: 1px 2px 5px 0px rgba(0,0,0,0.53)
 }
 
 .item-image {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
     height: 100%;
-    width: 60px;
+    width: 66px;
     object-fit: cover;
 }
 
@@ -253,15 +266,21 @@ button.dark:active{
 .item-preview .item-image {
     visibility: hidden;
 }
+.item.item-preview{
+    box-shadow: none;
+}
 
 .item-text {
     flex: 1;
     /* https://smad.jmu.edu/shen/webtype/lineheight.html */
     /* chosen by the simple eye to limit text to two lines */
     /* I don't want to have a js implementation */
-    height: 39px;
+    height: 33px;
     align-self: center;
     overflow: hidden;
+    padding-left: 6px;
+    padding-right: 6px;
+    font-size: 14px;
 }
 
 .item-dragged {
@@ -276,7 +295,7 @@ button.dark:active{
 .item-preview {
     border: none;
     color: rgba(0, 0, 0, 0);
-    background-color: rgba(0, 0, 0, 0.2);
+    background-color: rgba(0, 0, 0, 0.1);
 }
 
 
