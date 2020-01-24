@@ -1,5 +1,5 @@
 :root {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: Helvetica, Arial, sans-serif;
   user-select: none;
   --item-width: 180px;
   --item-padding: 0.5em;
@@ -25,6 +25,7 @@
 
 body {
   margin: 0;
+  background-color: #838D91;
 }
 
 * {
@@ -97,7 +98,6 @@ body {
 
 .board {
   float: left;
-  background-color: lightblue;
   width: var(--board-width);
   overflow: auto;
   height: var(--board-height);
@@ -242,13 +242,34 @@ body {
 /* TOP BAR */
 .top-bar {
   height: var(--top-bar-height);
+  background-color: rgba(0,0,0,.3);
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-button.active {
-  background-color: lightblue;
+button{
+  background-color: rgba(255,255,255,.33);
+  height: 32px;
+  margin-left: 4px;
+  border: none;
+  cursor: pointer;
+  border-radius: 2px;
+  color: white;
+  font-size: 16px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+button:hover{
+    background-color: rgba(255,255,255,.2);
+}
+button:active{
+    background-color: rgba(255,255,255,.1);
+}
+
+button.active{
+    text-decoration: underline
 }
 
 .user-info-container{
@@ -257,8 +278,9 @@ button.active {
 }
 
 .user-info-image{
-  height: var(--top-bar-height);
-  border-radius: var(--top-bar-height);
+  height: 32px;
+  border-radius: 16px;
+  margin-left: 2px;
   margin-left: 10px;
 }
 

@@ -698,10 +698,10 @@ viewTopBar : Model -> Maybe Login.LoginSuccessResponse -> Html Msg
 viewTopBar model login =
     div [ class "top-bar" ]
         [ div []
-            [ button [ classIf (model.sidebarState == Boards) "active", onClick (SetSidebar Boards) ] [ text "boards" ]
-            , button [ classIf (model.sidebarState == Search) "active", onClick (SetSidebar Search) ] [ text "search" ]
+            [ button [ classIf (model.sidebarState == Boards) "active", onClick (SetSidebar Boards) ] [ text "Boards" ]
+            , button [ classIf (model.sidebarState == Search) "active", onClick (SetSidebar Search) ] [ text "Search" ]
             ]
-        , button [ onClick SaveModifiedItemsOnDemand ] [ text "save" ]
+        , button [ onClick SaveModifiedItemsOnDemand ] [ text "Save" ]
         , Maybe.map viewUser login |> Maybe.withDefault (div [] [])
         ]
 
@@ -709,8 +709,7 @@ viewTopBar model login =
 viewUser : Login.LoginSuccessResponse -> Html Msg
 viewUser loginInfo =
     div [ class "user-info-container" ]
-        [ button [ onClick Logout ] [ text "logout" ]
-        , span [] [ text loginInfo.displayName ]
+        [ button [ onClick Logout ] [ text "Logout" ]
         , img [ class "user-info-image", src loginInfo.photoURL ] []
         ]
 
