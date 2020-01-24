@@ -698,10 +698,10 @@ viewTopBar : Model -> Maybe Login.LoginSuccessResponse -> Html Msg
 viewTopBar model login =
     div [ class "top-bar" ]
         [ div []
-            [ button [ classIf (model.sidebarState == Boards) "active", onClick (SetSidebar Boards) ] [ text "boards" ]
-            , button [ classIf (model.sidebarState == Search) "active", onClick (SetSidebar Search) ] [ text "search" ]
+            [ button [ classIf (model.sidebarState == Boards) "active", onClick (SetSidebar Boards) ] [ text "Boards" ]
+            , button [ classIf (model.sidebarState == Search) "active", onClick (SetSidebar Search) ] [ text "Search" ]
             ]
-        , button [ onClick SaveModifiedItemsOnDemand ] [ text "save" ]
+        , button [ onClick SaveModifiedItemsOnDemand ] [ text "Save" ]
         , Maybe.map viewUser login |> Maybe.withDefault (div [] [])
         ]
 
@@ -709,8 +709,7 @@ viewTopBar model login =
 viewUser : Login.LoginSuccessResponse -> Html Msg
 viewUser loginInfo =
     div [ class "user-info-container" ]
-        [ button [ onClick Logout ] [ text "logout" ]
-        , span [] [ text loginInfo.displayName ]
+        [ button [ onClick Logout ] [ text "Logout" ]
         , img [ class "user-info-image", src loginInfo.photoURL ] []
         ]
 
@@ -732,7 +731,7 @@ viewBoard model =
                             |> unpackMaybes
                             |> List.map (\stack -> viewStack model.renamingState model.dragState [ class "column-board" ] (getStackToView model stack.id))
                         )
-                        [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ] ]
+                        [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "Add column" ], div [ class "post-add-stack-space" ] [] ]
                     )
                 ]
 
@@ -742,7 +741,7 @@ viewBoard model =
 
 viewBoardBar : Board -> Html Msg
 viewBoardBar { name } =
-    div [ class "board-header" ] [ text name ]
+    div [ class "board-title" ] [ text name ]
 
 
 viewStack : RenamingState -> DragState -> List (Attribute Msg) -> ( Stack, List Item ) -> Html Msg
@@ -756,8 +755,8 @@ viewStack modificationState dragState attributes ( { id, name }, items ) =
             [ div [ class "column-title", onMouseDown (StackTitleMouseDown id) ]
                 [ viewContent modificationState { id = id, name = name }
                 , div [ class "column-title-actions" ]
-                    [ button [ onMouseDownAlwaysStopPropagation (StartModifyingItem { itemId = id, newName = name }) ] [ text "E" ]
-                    , button [ onMouseDownAlwaysStopPropagation (RemoveStack id) ] [ text "X" ]
+                    [ button [ onMouseDownAlwaysStopPropagation (StartModifyingItem { itemId = id, newName = name }), class "icon-button" ] [ img [ src "/icons/edit.svg" ] [] ]
+                    , button [ onMouseDownAlwaysStopPropagation (RemoveStack id), class "icon-button" ] [ img [ src "/icons/delete.svg" ] [] ]
                     ]
                 ]
             , div [ class "column-content" ]
@@ -800,46 +799,71 @@ viewSearch model =
                 Nothing ->
                     []
     in
-    [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick (SetSidebar Hidden) ] [ text "<" ] ]
-    , input [ onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
+    [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick (SetSidebar Hidden), class "icon-button" ] [ img [ src "/icons/chevron.svg" ] [] ] ]
+    , input [ class "sidebar-search-input", onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
     , div [] (List.map (\item -> viewItem [] model.dragState item) items)
     ]
 
 
+
+--+ model.userProfile.syncTime
+
+
 viewBoards model =
-    [ div [ class "sidebar-header sidebar-padded" ]
-        [ h3 [] [ text "Boards" ]
-        , button [ onClick (SetSidebar Hidden) ] [ text "<" ]
+    [ div [ class "sidebar-header" ]
+        [ h3 [] [ text ("Boards" ++ asteriskIf model.needToSyncProfile), viewSyncMessage model.userProfile ]
+        , button [ onClick (SetSidebar Hidden), class "icon-button" ] [ img [ src "/icons/chevron.svg" ] [] ]
         ]
     , div []
         (model.userProfile.boards
             |> List.map (flip Dict.get model.boards)
             |> unpackMaybes
-            |> List.map (\item -> viewBoardButton model [] item)
+            |> List.map (\item -> viewBoardButton model.dragState model [] item)
         )
-    , div [] [ button [ onClick CreateNewBoard ] [ text "Add" ] ]
+    , div [ class "add-board-container" ] [ button [ onClick CreateNewBoard, class "dark" ] [ text "Add board" ] ]
     ]
 
 
-viewBoardButton : Model -> List (Attribute Msg) -> Board -> Html Msg
-viewBoardButton model attrs item =
+viewSyncMessage profile =
+    div []
+        [ div [ class "small-text" ] [ text ("Saving boards every " ++ toInt profile.syncTime ++ " seconds") ]
+        , div [ class "small-text" ] [ text "Press 'Save' to force saving" ]
+        ]
+
+
+toInt x =
+    String.fromInt (round (x / 1000))
+
+
+viewBoardButton : DragState -> Model -> List (Attribute Msg) -> Board -> Html Msg
+viewBoardButton dragState model attrs item =
     div
         (List.append
             [ class "sidebar-boards-button"
             , classIf (model.userProfile.selectedBoard == item.id) "active"
-            , onClickIf (not (isDraggingAnyBoard model.dragState)) (SelectBoard item.id)
+            , onClickIf (not (isDraggingAnyBoard dragState)) (SelectBoard item.id)
             , onMouseDown (BoardMouseDown item.id)
             , onMouseEnter (BoardEnterDuringDrag item.id)
-            , classIf (isDraggingBoard model.dragState item.id) "item-preview"
+            , classIf (isDraggingBoard dragState item.id) "item-preview"
             ]
             attrs
         )
-        [ viewContent model.renamingState item
+        [ viewContent model.renamingState { id = item.id, name = item.name ++ asteriskIf (Set.member item.id model.boardIdsToSync) }
         , div [ class "sidebar-boards-button-actions" ]
-            [ button [ onClickAlwaysStopPropagation (StartModifyingItem { itemId = item.id, newName = item.name }) ] [ text "E" ]
-            , button [ onClickAlwaysStopPropagation (RemoveBoard item.id) ] [ text "X" ]
+            [ button [ onClickAlwaysStopPropagation (StartModifyingItem { itemId = item.id, newName = item.name }), class "icon-button" ]
+                [ img [ src "/icons/edit.svg" ] [] ]
+            , button [ onClickAlwaysStopPropagation (RemoveBoard item.id), class "icon-button" ]
+                [ img [ src "/icons/delete.svg" ] [] ]
             ]
         ]
+
+
+asteriskIf condition =
+    if condition then
+        "*"
+
+    else
+        ""
 
 
 viewContent modificationState { name, id } =
@@ -892,7 +916,7 @@ viewElementBeingDragged model =
         DraggingBoard mouseMoveEvent offsets boardId ->
             model.boards
                 |> Dict.get boardId
-                |> Maybe.map (viewBoardButton model (getAttributes mouseMoveEvent offsets))
+                |> Maybe.map (viewBoardButton NoDrag model (getAttributes mouseMoveEvent offsets))
                 |> Maybe.withDefault (div [] [])
 
         _ ->
