@@ -1,9 +1,10 @@
 :root {
     font-family: Helvetica, Arial, sans-serif;
     user-select: none;
-    --item-width: 180px;
-    --item-padding: 0.5em;
-    --double-item-padding: 1em;
+    --item-width: 300px;
+    --item-padding: 14px;
+    --double-item-padding: 28px;
+
     --board-header-height: 40px;
     --top-bar-height: 40px;
     --drag-cursor: pointer;
@@ -46,14 +47,12 @@ body {
 
 .sidebar {
     float: left;
-    background-color: aquamarine;
+    background-color: #EBECF0;
     overflow: auto;
     width: var(--sidebar-width);
     height: var(--board-height);
-}
-
-.sidebar-padded {
     padding: var(--item-padding);
+    padding-top: 0;
 }
 
 .sidebar-header {
@@ -61,19 +60,29 @@ body {
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
 }
 
 .sidebar-boards-button {
-    height: 40px;
+    height: 48px;
     display: flex;
     align-items: center;
-    width: var(--sidebar-width);
+    margin-bottom: var(--item-padding);
+    width: var(--item-width);
     padding: var(--item-padding);
-    padding-left: calc(var(--item-padding));
-    border-bottom: 1px lightgrey solid;
     cursor: var(--drag-cursor);
     position: relative;
+    border-radius: 2px;
+    background-color: rgba(0,0,0,.05);
+}
+.sidebar-boards-button:hover{
+    background-color: rgba(0,0,0,.15);
+}
+
+.sidebar-boards-button:active{
+    background-color: rgba(0,0,0,.20);
+}
+.sidebar-boards-button.active {
+    font-weight: bold;
 }
 
 .sidebar-boards-button-actions {
@@ -81,6 +90,36 @@ body {
     flex-direction: row;
     position: absolute;
     right: 0;
+}
+button.dark{
+    color: white;
+    font-weight: bold;
+    background-color: rgba(0,0,0,.33);
+}
+button.dark:hover{
+    background-color: rgba(0,0,0,.45);
+}
+button.dark:active{
+    background-color: rgba(0,0,0,.55);
+}
+.add-board-container{
+    display: flex;
+    justify-content: center;
+    align-content: center;
+}
+
+.icon-button{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: transparent;
+    filter: invert(35%) sepia(0%) saturate(0%) hue-rotate(7deg) brightness(96%) contrast(99%);
+}
+.icon-button:hover{
+    background-color: rgba(0,0,0,.10);
+}
+.icon-button:active{
+    background-color: rgba(0,0,0,.15);
 }
 
 .sidebar-boards-button:hover .sidebar-boards-button-actions {
@@ -91,10 +130,7 @@ body {
     display: none;
 }
 
-.sidebar-boards-button.active {
-    background-color: rgba(0, 0, 0, 0.2);
-    padding-left: calc(var(--item-padding));
-}
+
 
 /* BOARD and STACKS */
 
@@ -262,8 +298,6 @@ button {
     border-radius: 2px;
     color: white;
     font-size: 16px;
-    padding-left: 8px;
-    padding-right: 8px;
 }
 
 button:hover {
@@ -281,6 +315,7 @@ button.active {
 .user-info-container {
     display: flex;
     align-items: center;
+    margin-right: 4px;
 }
 
 .user-info-image {

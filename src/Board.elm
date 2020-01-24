@@ -799,16 +799,16 @@ viewSearch model =
                 Nothing ->
                     []
     in
-    [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick (SetSidebar Hidden) ] [ text "<" ] ]
+    [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick (SetSidebar Hidden), class "icon-button" ] [ img [ src "/icons/chevron.svg" ] [] ] ]
     , input [ onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
     , div [] (List.map (\item -> viewItem [] model.dragState item) items)
     ]
 
 
 viewBoards model =
-    [ div [ class "sidebar-header sidebar-padded" ]
+    [ div [ class "sidebar-header" ]
         [ h3 [] [ text "Boards" ]
-        , button [ onClick (SetSidebar Hidden) ] [ text "<" ]
+        , button [ onClick (SetSidebar Hidden), class "icon-button" ] [ img [ src "/icons/chevron.svg" ] [] ]
         ]
     , div []
         (model.userProfile.boards
@@ -816,7 +816,7 @@ viewBoards model =
             |> unpackMaybes
             |> List.map (\item -> viewBoardButton model [] item)
         )
-    , div [] [ button [ onClick CreateNewBoard ] [ text "Add" ] ]
+    , div [ class "add-board-container" ] [ button [ onClick CreateNewBoard, class "dark" ] [ text "Add" ] ]
     ]
 
 
@@ -835,8 +835,12 @@ viewBoardButton model attrs item =
         )
         [ viewContent model.renamingState item
         , div [ class "sidebar-boards-button-actions" ]
-            [ button [ onClickAlwaysStopPropagation (StartModifyingItem { itemId = item.id, newName = item.name }) ] [ text "E" ]
-            , button [ onClickAlwaysStopPropagation (RemoveBoard item.id) ] [ text "X" ]
+            [ button [ onClickAlwaysStopPropagation (StartModifyingItem { itemId = item.id, newName = item.name }), class "icon-button" ]
+                [ img [ src "/icons/edit.svg" ] []
+                ]
+            , button [ onClickAlwaysStopPropagation (RemoveBoard item.id), class "icon-button" ]
+                [ img [ src "/icons/delete.svg" ] []
+                ]
             ]
         ]
 
