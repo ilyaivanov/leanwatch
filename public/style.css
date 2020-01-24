@@ -34,7 +34,13 @@ body {
 }
 
 .add-stack-button {
-    align-self: flex-start;
+    margin-left: var(--item-padding);
+    min-width: 130px;
+    padding-left: 20px;
+    padding-right: 20px;
+}
+.post-add-stack-space{
+    min-width: var(--item-padding);
 }
 
 .player-container {
@@ -75,11 +81,11 @@ body {
     background-color: rgba(0,0,0,.05);
 }
 .sidebar-boards-button:hover{
-    background-color: rgba(0,0,0,.15);
+    background-color: rgba(0,0,0,.10);
 }
 
 .sidebar-boards-button:active{
-    background-color: rgba(0,0,0,.20);
+    background-color: rgba(0,0,0,.15);
 }
 .sidebar-boards-button.active {
     font-weight: bold;
@@ -134,7 +140,7 @@ button.dark:active{
     width: 100%;
     height: 32px;
     padding: 4px;
-    margin-bottom: 10px;
+    margin-bottom: 20px;
     font-size: 16px;
 }
 
@@ -183,23 +189,25 @@ button.dark:active{
 }
 
 .column {
-    background-color: cadetblue;
+    background-color: #EBECF0;
+    border-radius: 4px;
     max-height: var(--column-height);
     overflow: auto;
+    box-shadow: 1px 2px 5px 0px rgba(0,0,0,0.53);
 }
 
 .column-board {
     margin-left: var(--item-padding);
-    margin-top: var(--item-padding);
 }
 
 .column-title {
     padding: var(--item-padding);
-    height: 2em;
+    height: 3em;
     user-select: none;
     cursor: var(--drag-cursor);
     position: relative;
-    /* background-color: rgb(234, 253, 205); */
+    color: rgba(0,0,0,0.8);
+    font-weight: bold;
 }
 
 .column-title-actions {
@@ -243,7 +251,11 @@ button.dark:active{
     cursor: var(--drag-cursor);
     position: relative;
     border-radius: 4px;
-    box-shadow: 1px 2px 5px 0px rgba(0,0,0,0.53)
+    box-shadow: 1px 2px 5px 0px rgba(0,0,0,0.53);
+}
+
+.item:first-of-type{
+    margin-top: 0;
 }
 
 .item-image {

@@ -731,7 +731,7 @@ viewBoard model =
                             |> unpackMaybes
                             |> List.map (\stack -> viewStack model.renamingState model.dragState [ class "column-board" ] (getStackToView model stack.id))
                         )
-                        [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "add" ] ]
+                        [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "Add column" ], div [ class "post-add-stack-space" ] [] ]
                     )
                 ]
 
