@@ -729,7 +729,7 @@ viewBoard model =
                         (board.children
                             |> List.map (\stackId -> Dict.get stackId model.stacks)
                             |> unpackMaybes
-                            |> List.map (\stack -> viewStack model.renamingState model.dragState [ class "column-board" ] (getStackToView model stack.id))
+                            |> List.map (\stack -> viewStack model [ class "column-board" ] (getStackToView model stack.id))
                         )
                         [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "Add column" ], div [ class "post-add-stack-space" ] [] ]
                     )
@@ -744,8 +744,8 @@ viewBoardBar { name } =
     div [ class "board-title" ] [ text name ]
 
 
-viewStack : RenamingState -> DragState -> List (Attribute Msg) -> ( Stack, List Item ) -> Html Msg
-viewStack modificationState dragState attributes ( { id, name }, items ) =
+viewStack : { a | renamingState : RenamingState, dragState : DragState, videoBeingPlayed : Maybe String } -> List (Attribute Msg) -> ( Stack, List Item ) -> Html Msg
+viewStack { renamingState, dragState, videoBeingPlayed } attributes ( { id, name }, items ) =
     div (List.append [ class "column-drag-overlay" ] attributes)
         [ div
             [ class "column"
@@ -753,7 +753,7 @@ viewStack modificationState dragState attributes ( { id, name }, items ) =
             , onMouseEnter (StackEnterDuringDrag id)
             ]
             [ div [ class "column-title", onMouseDown (StackTitleMouseDown id) ]
-                [ viewContent modificationState { id = id, name = name }
+                [ viewContent renamingState { id = id, name = name }
                 , div [ class "column-title-actions" ]
                     [ button [ onMouseDownAlwaysStopPropagation (StartModifyingItem { itemId = id, newName = name }), class "icon-button" ] [ img [ src "/icons/edit.svg" ] [] ]
                     , button [ onMouseDownAlwaysStopPropagation (RemoveStack id), class "icon-button" ] [ img [ src "/icons/delete.svg" ] [] ]
@@ -764,7 +764,7 @@ viewStack modificationState dragState attributes ( { id, name }, items ) =
                     [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag id) ] [] ]
 
                  else
-                    List.map (\item -> viewItem [] dragState item) items
+                    List.map (\item -> viewItem [] dragState videoBeingPlayed item) items
                 )
             ]
         , div [ class "column-footer", onMouseEnter (StackOverlayEnterDuringDrag id) ] []
@@ -801,12 +801,8 @@ viewSearch model =
     in
     [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick (SetSidebar Hidden), class "icon-button" ] [ img [ src "/icons/chevron.svg" ] [] ] ]
     , input [ class "sidebar-search-input", onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
-    , div [] (List.map (\item -> viewItem [] model.dragState item) items)
+    , div [] (List.map (\item -> viewItem [] model.dragState model.videoBeingPlayed item) items)
     ]
-
-
-
---+ model.userProfile.syncTime
 
 
 viewBoards model =
@@ -879,12 +875,13 @@ viewContent modificationState { name, id } =
             text name
 
 
-viewItem : List (Attribute Msg) -> DragState -> Item -> Html Msg
-viewItem atts dragState { id, name, youtubeId } =
+viewItem : List (Attribute Msg) -> DragState -> Maybe String -> Item -> Html Msg
+viewItem atts dragState videoBeingPlayed { id, name, youtubeId } =
     div
         (List.append
             [ class "item"
             , classIf (isDraggingItem dragState id) "item-preview"
+            , classIf (Maybe.withDefault "" videoBeingPlayed == id) "active"
             ]
             atts
         )
@@ -895,6 +892,7 @@ viewItem atts dragState { id, name, youtubeId } =
         ]
 
 
+viewElementBeingDragged : Model -> Html Msg
 viewElementBeingDragged model =
     let
         getAttributes : MouseMoveEvent -> Offsets -> List (Attribute msg)
@@ -907,11 +905,11 @@ viewElementBeingDragged model =
     case model.dragState of
         DraggingItem mouseMoveEvent offsets itemId ->
             Dict.get itemId model.items
-                |> Maybe.map (viewItem (getAttributes mouseMoveEvent offsets) NoDrag)
+                |> Maybe.map (viewItem (getAttributes mouseMoveEvent offsets) NoDrag model.videoBeingPlayed)
                 |> Maybe.withDefault (div [] [])
 
         DraggingStack mouseMoveEvent offsets stackId ->
-            viewStack NoRename NoDrag (getAttributes mouseMoveEvent offsets) (getStackToView model stackId)
+            viewStack { renamingState = NoRename, dragState = NoDrag, videoBeingPlayed = model.videoBeingPlayed } (getAttributes mouseMoveEvent offsets) (getStackToView model stackId)
 
         DraggingBoard mouseMoveEvent offsets boardId ->
             model.boards
