@@ -137,6 +137,10 @@ button.dark:active {
     background-color: rgba(0, 0, 0, .15);
 }
 
+.icon-button:last-of-type{
+    margin-right: 8px;
+}
+
 .sidebar-boards-button:hover .sidebar-boards-button-actions {
     display: flex;
 }
@@ -234,6 +238,10 @@ button.dark:active {
 
 .column-title:hover .column-title-actions {
     display: flex;
+}
+/*Do not show tooltips when dragging some item over a tooltip area*/
+.board-during-drag .board .column-title-actions{
+    display: none;
 }
 
 .column-content {
