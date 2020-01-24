@@ -214,7 +214,7 @@ init =
     , searchTerm = ""
     , currentSearchId = ""
     , videoBeingPlayed = Nothing
-    , sidebarState = Search
+    , sidebarState = Boards
     }
 
 
@@ -805,35 +805,50 @@ viewSearch model =
     ]
 
 
+
+--+ model.userProfile.syncTime
+
+
 viewBoards model =
     [ div [ class "sidebar-header" ]
-        [ h3 [] [ text "Boards" ]
+        [ h3 [] [ text ("Boards" ++ asteriskIf model.needToSyncProfile), viewSyncMessage model.userProfile ]
         , button [ onClick (SetSidebar Hidden), class "icon-button" ] [ img [ src "/icons/chevron.svg" ] [] ]
         ]
     , div []
         (model.userProfile.boards
             |> List.map (flip Dict.get model.boards)
             |> unpackMaybes
-            |> List.map (\item -> viewBoardButton model [] item)
+            |> List.map (\item -> viewBoardButton model.dragState model [] item)
         )
     , div [ class "add-board-container" ] [ button [ onClick CreateNewBoard, class "dark" ] [ text "Add" ] ]
     ]
 
 
-viewBoardButton : Model -> List (Attribute Msg) -> Board -> Html Msg
-viewBoardButton model attrs item =
+viewSyncMessage profile =
+    div []
+        [ div [ class "small-text" ] [ text ("Saving boards every " ++ toInt profile.syncTime ++ " seconds") ]
+        , div [ class "small-text" ] [ text "Press 'Save' to force saving" ]
+        ]
+
+
+toInt x =
+    String.fromInt (round (x / 1000))
+
+
+viewBoardButton : DragState -> Model -> List (Attribute Msg) -> Board -> Html Msg
+viewBoardButton dragState model attrs item =
     div
         (List.append
             [ class "sidebar-boards-button"
             , classIf (model.userProfile.selectedBoard == item.id) "active"
-            , onClickIf (not (isDraggingAnyBoard model.dragState)) (SelectBoard item.id)
+            , onClickIf (not (isDraggingAnyBoard dragState)) (SelectBoard item.id)
             , onMouseDown (BoardMouseDown item.id)
             , onMouseEnter (BoardEnterDuringDrag item.id)
-            , classIf (isDraggingBoard model.dragState item.id) "item-preview"
+            , classIf (isDraggingBoard dragState item.id) "item-preview"
             ]
             attrs
         )
-        [ viewContent model.renamingState item
+        [ viewContent model.renamingState { id = item.id, name = item.name ++ asteriskIf (Set.member item.id model.boardIdsToSync) }
         , div [ class "sidebar-boards-button-actions" ]
             [ button [ onClickAlwaysStopPropagation (StartModifyingItem { itemId = item.id, newName = item.name }), class "icon-button" ]
                 [ img [ src "/icons/edit.svg" ] [] ]
@@ -841,6 +856,14 @@ viewBoardButton model attrs item =
                 [ img [ src "/icons/delete.svg" ] [] ]
             ]
         ]
+
+
+asteriskIf condition =
+    if condition then
+        "*"
+
+    else
+        ""
 
 
 viewContent modificationState { name, id } =
@@ -893,7 +916,7 @@ viewElementBeingDragged model =
         DraggingBoard mouseMoveEvent offsets boardId ->
             model.boards
                 |> Dict.get boardId
-                |> Maybe.map (viewBoardButton model (getAttributes mouseMoveEvent offsets))
+                |> Maybe.map (viewBoardButton NoDrag model (getAttributes mouseMoveEvent offsets))
                 |> Maybe.withDefault (div [] [])
 
         _ ->
