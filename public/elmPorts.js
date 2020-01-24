@@ -17,7 +17,9 @@ function registerPorts(ports) {
       ports.onLogout.send("ignored value");
   });
 
-  ports.googleSignin.subscribe(() => auth.signInWithPopup(provider));
+  ports.googleSignin.subscribe(() => auth.signInWithPopup(provider).then().catch(res => {
+    ports.onLoginCancel.send(null);
+  }));
   ports.logout.subscribe(() => auth.signOut());
 
   ports.saveBoard.subscribe(function (boards) {

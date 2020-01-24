@@ -93,6 +93,7 @@ subscriptions model =
     Sub.batch
         [ Login.onLogin Login.OnLogin |> Sub.map LoginMsg
         , Login.onLogout Login.OnLogout |> Sub.map LoginMsg
+        , Login.onLoginCancel Login.OnLoginError |> Sub.map LoginMsg
         , Board.onUserProfileLoaded Board.UserProfileLoaded |> Sub.map BoardMsg
         , Board.onBoardsLoaded Board.BoardsLoaded |> Sub.map BoardMsg
         , Board.onBoardCreated Board.OnBoardCreated |> Sub.map BoardMsg

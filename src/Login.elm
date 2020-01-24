@@ -21,10 +21,14 @@ type Msg
     | SetPassword String
     | OnLoginRequest
     | OnLogin LoginSuccessResponse
+    | OnLoginError ()
     | OnLogout String
 
 
 port onLogin : (LoginSuccessResponse -> msg) -> Sub msg
+
+
+port onLoginCancel : (() -> msg) -> Sub msg
 
 
 port onLogout : (String -> msg) -> Sub msg
@@ -64,7 +68,7 @@ type alias LoginSuccessResponse =
 
 
 type alias LoginErrorResponse =
-    { errorMessage : String
+    { message : String
     }
 
 
@@ -86,6 +90,9 @@ update msg model key =
 
         OnLogin res ->
             ( { model | loginStatus = LoggedIn res }, Nav.pushUrl key "/" )
+
+        OnLoginError _ ->
+            ( { model | loginStatus = Anonymous }, Cmd.none )
 
         OnLogout res ->
             ( { model | loginStatus = Anonymous }, Nav.pushUrl key "/login" )
@@ -111,8 +118,7 @@ viewLogin model =
             , div [ class "or-label" ] [ text "OR" ]
             , button [ class "button material", tabindex 4, classIf isLoading "disabled", onClickIf (not isLoading) OnLoginRequest ] [ img [ class "google-icon", src "/icons/google.svg" ] [], text "Log in with Google" ]
             , div [ class "line" ] []
-            , div [] [ text "Private testing is taking place. We are sorry that you can't sign up yet" ]
-            , div [] [ a [ href "mailto: static.ila@gmail.com" ] [ text "Ask us for an account thought ;)" ] ]
+            , div [] [ text "Alpha testing" ]
             ]
         ]
 
