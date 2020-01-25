@@ -94,6 +94,8 @@ body {
 
 .sidebar-boards-button.active {
     font-weight: bold;
+    color: white;
+    background-color: var(--primary-color);
 }
 
 .sidebar-boards-button-actions {
@@ -149,6 +151,13 @@ button.dark:active {
 
 .sidebar-boards-button:hover.item-preview .sidebar-boards-button-actions {
     display: none;
+}
+
+.sidebar-boards-button.item-preview {
+    box-shadow: none;
+    border: none;
+    color: rgba(0, 0, 0, 0);
+    background-color: rgba(0, 0, 0, 0.2);
 }
 
 .sidebar-search-input {
@@ -325,7 +334,6 @@ button.dark:active {
 .item-dragged {
     position: fixed;
     margin: 0;
-    padding: 0;
     pointer-events: none;
     transform: rotate(4deg);
     transition: transform 100ms;
