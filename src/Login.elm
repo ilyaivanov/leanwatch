@@ -118,7 +118,7 @@ viewLogin model =
             , div [ class "or-label" ] [ text "OR" ]
             , button [ class "button material", tabindex 4, classIf isLoading "disabled", onClickIf (not isLoading) OnLoginRequest ] [ img [ class "google-icon", src "/icons/google.svg" ] [], text "Log in with Google" ]
             , div [ class "line" ] []
-            , div [] [ text "Alpha testing" ]
+            , div [] [ text "Lean Watch - if YouTube and Trello had a bastard son" ]
             ]
         ]
 

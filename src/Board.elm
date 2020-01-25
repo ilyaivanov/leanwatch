@@ -672,6 +672,7 @@ finishModification model =
                 , boards = updateName model.boards itemId newName
                 , stacks = updateName model.stacks itemId newName
             }
+                |> markSelectedBoardAsNeededToSync
 
         NoRename ->
             model
@@ -856,6 +857,7 @@ viewBoards model =
             |> List.map (\item -> viewBoardButton model.dragState model [] item)
         )
     , div [ class "add-board-container" ] [ button [ onClick CreateNewBoard, class "dark" ] [ text "Add board" ] ]
+    , div [ class "small-text" ] [ text "* - means board requires syncing" ]
     ]
 
 

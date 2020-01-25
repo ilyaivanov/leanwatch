@@ -19,7 +19,7 @@
             100vh - var(--top-bar-height) - var(--board-header-height)
     );
     --column-height: calc(
-            100vh - var(--top-bar-height) - var(--item-padding) - var(--item-padding) -
+            100vh - var(--top-bar-height) - var(--item-padding) -
             var(--board-header-height)
     );
 
@@ -123,6 +123,7 @@ button.dark:active {
     display: flex;
     justify-content: center;
     align-content: center;
+    margin-bottom: 10px;
 }
 
 .icon-button {
@@ -222,9 +223,10 @@ button.dark:active {
 }
 
 .column {
+    max-height: var(--column-height);
+    max-width: var(--sidebar-width);
     background-color: #EBECF0;
     border-radius: 4px;
-    max-height: var(--column-height);
     overflow: auto;
     box-shadow: 1px 2px 5px 0px rgba(0, 0, 0, 0.53);
 }
@@ -324,14 +326,11 @@ button.dark:active {
 
 .item-text {
     flex: 1;
-    /* https://smad.jmu.edu/shen/webtype/lineheight.html */
-    /* chosen by the simple eye to limit text to two lines */
-    /* I don't want to have a js implementation */
-    height: 33px;
-    align-self: center;
     overflow: hidden;
     padding-left: 6px;
     padding-right: 6px;
+    display: flex;
+    align-items: center;
     font-size: 14px;
 }
 
