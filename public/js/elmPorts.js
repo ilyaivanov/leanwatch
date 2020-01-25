@@ -1,7 +1,7 @@
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-function registerPorts(ports) {
+function registerFirebase(ports) {
   const provider = new firebase.auth.GoogleAuthProvider();
 
   auth.onAuthStateChanged(function (user) {

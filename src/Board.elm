@@ -1,4 +1,4 @@
-port module Board exposing (Item, Model, Msg(..), Stack, createBoard, init, onBoardCreated, onBoardsLoaded, onUserProfileLoaded, update, view)
+port module Board exposing (Item, Model, Msg(..), Stack, createBoard, init, onBoardCreated, onBoardsLoaded, onUserProfileLoaded, onVideoEnded, update, view)
 
 import Browser.Dom as Dom exposing (focus)
 import Dict exposing (Dict)
@@ -9,7 +9,7 @@ import Html.Attributes as Attributes exposing (..)
 import Html.Events exposing (onBlur, onClick, onInput)
 import Http
 import Json.Decode as Json
-import ListUtils exposing (flip, removeItem, unpackMaybes)
+import ListUtils exposing (flip, getNextItem, removeItem, unpackMaybes)
 import Login
 import Process
 import Random
@@ -38,6 +38,12 @@ port createBoard : () -> Cmd msg
 
 
 port logout : () -> Cmd msg
+
+
+port play : String -> Cmd msg
+
+
+port onVideoEnded : (() -> msg) -> Sub msg
 
 
 port onBoardCreated : (BoardResponse -> msg) -> Sub msg
@@ -166,6 +172,7 @@ type Msg
     | OnSearchInput String
       -- Commands
     | CreateSingleId
+    | VideoEnded ()
       -- Debounced search
     | AttemptToSearch String
     | DebouncedSearch String String
@@ -362,7 +369,11 @@ update msg model =
         MouseUp ->
             case model.dragState of
                 ItemPressedNotYetMoved _ _ id ->
-                    noComand { model | dragState = NoDrag, videoBeingPlayed = Just id }
+                    let
+                        cmd =
+                            getItemById id model |> Maybe.map (\i -> play i.youtubeId) |> Maybe.withDefault Cmd.none
+                    in
+                    ( { model | dragState = NoDrag, videoBeingPlayed = Just id }, cmd )
 
                 _ ->
                     noComand { model | dragState = NoDrag }
@@ -593,6 +604,28 @@ update msg model =
                 Nothing ->
                     noComand model
 
+        VideoEnded _ ->
+            let
+                stack =
+                    getParentByChildren (model.videoBeingPlayed |> Maybe.withDefault "") model.stacks
+            in
+            case ( stack, model.videoBeingPlayed ) of
+                ( Just actualStack, Just videoPlayed ) ->
+                    case getNextItem videoPlayed actualStack.children of
+                        Just nextItemId ->
+                            case getItemById nextItemId model of
+                                Just nextItem ->
+                                    ( { model | videoBeingPlayed = Just nextItem.id }, play nextItem.youtubeId )
+
+                                Nothing ->
+                                    ( model, Cmd.none )
+
+                        Nothing ->
+                            ( model, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
         Noop ->
             noComand model
 
@@ -617,15 +650,21 @@ saveModifiedItems model =
             else
                 Cmd.none
 
-        syncBoards =
-            Set.toList model.boardIdsToSync |> List.map (\boardId -> denormalizeBoard boardId model) |> unpackMaybes |> saveBoard
+        boardsToSync =
+            Set.toList model.boardIdsToSync |> List.map (\boardId -> denormalizeBoard boardId model) |> unpackMaybes
+
+        syncBoardsCmd =
+            if List.isEmpty boardsToSync then
+                Cmd.none
+
+            else
+                saveBoard boardsToSync
     in
-    ( { model | needToSyncProfile = False, boardIdsToSync = Set.empty }, Cmd.batch [ syncProfile, syncBoards ] )
+    ( { model | needToSyncProfile = False, boardIdsToSync = Set.empty }, Cmd.batch [ syncProfile, syncBoardsCmd ] )
 
 
 finishModification : Model -> Model
 finishModification model =
-    -- TODO: fogure out how to sync this to the backend
     case model.renamingState of
         RenamingItem { itemId, newName } ->
             { model
@@ -922,30 +961,6 @@ viewElementBeingDragged model =
 
 
 viewPlayer model =
-    case model.videoBeingPlayed of
-        Just videoId ->
-            let
-                item =
-                    getItemById videoId model
-            in
-            case item of
-                Just actualItem ->
-                    div [ class "player-container" ]
-                        [ iframe
-                            [ width 400
-                            , height 150
-                            , src ("https://www.youtube.com/embed/" ++ actualItem.youtubeId ++ "?autoplay=1")
-                            , attribute "frameborder" "0"
-                            , attribute "allowfullscreen" "true"
-                            , attribute "modestBranding" "1"
-                            , attribute "showinfo" "1"
-                            , attribute "allow" "accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                            ]
-                            []
-                        ]
-
-                Nothing ->
-                    div [] []
-
-        Nothing ->
-            div [] []
+    div [ class "player-container" ]
+        [ div [ id "youtubePlayer" ] []
+        ]

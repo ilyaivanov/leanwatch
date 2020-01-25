@@ -1,4 +1,4 @@
-function registerPorts(ports) {
+function registerFirebase(ports) {
   setTimeout(() => {
     console.log(ports);
     ports.onLogin.send({
