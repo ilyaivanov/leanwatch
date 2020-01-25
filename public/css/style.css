@@ -145,6 +145,10 @@ button.dark:active {
     margin-right: 8px;
 }
 
+.icon-button.hide-icon{
+    margin-right: 0;
+}
+
 .sidebar-boards-button:hover .sidebar-boards-button-actions {
     display: flex;
 }

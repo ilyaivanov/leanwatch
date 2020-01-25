@@ -549,7 +549,7 @@ update msg model =
                 newProfile =
                     { profile | selectedBoard = boardResponse.id, boards = profile.boards ++ [ boardResponse.id ] }
             in
-            ( mergeAndNormalizeResponse boardResponse model |> updateProfileAndMarkAsNeededToSync newProfile, Cmd.none )
+            ( mergeAndNormalizeResponse boardResponse model |> updateProfileAndMarkAsNeededToSync newProfile |> markSelectedBoardAsNeededToSync, Cmd.none )
 
         StartModifyingItem item ->
             ( { model | renamingState = RenamingItem item }, focus item.itemId |> Task.attempt FocusResult )
@@ -838,7 +838,7 @@ viewSearch model =
                 Nothing ->
                     []
     in
-    [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick (SetSidebar Hidden), class "icon-button" ] [ img [ src "/icons/chevron.svg" ] [] ] ]
+    [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick (SetSidebar Hidden), class "icon-button hide-icon" ] [ img [ src "/icons/chevron.svg" ] [] ] ]
     , input [ class "sidebar-search-input", onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
     , div [] (List.map (\item -> viewItem [] model.dragState model.videoBeingPlayed item) items)
     ]
@@ -847,7 +847,7 @@ viewSearch model =
 viewBoards model =
     [ div [ class "sidebar-header" ]
         [ h3 [] [ text ("Boards" ++ asteriskIf model.needToSyncProfile), viewSyncMessage model.userProfile ]
-        , button [ onClick (SetSidebar Hidden), class "icon-button" ] [ img [ src "/icons/chevron.svg" ] [] ]
+        , button [ onClick (SetSidebar Hidden), class "icon-button hide-icon" ] [ img [ src "/icons/chevron.svg" ] [] ]
         ]
     , div []
         (model.userProfile.boards
