@@ -1,4 +1,4 @@
-module ListUtils exposing (..)
+module Utils.ListUtils exposing (..)
 
 import List.Extra as LE exposing (..)
 

@@ -3,18 +3,18 @@ port module Board exposing (Item, Model, Msg(..), Stack, createBoard, init, onBo
 import Browser.Dom as Dom exposing (focus)
 import Dict exposing (Dict)
 import DictMoves exposing (Parent, getParentByChildren, moveItem, moveItemInList, moveItemToEnd)
-import ExtraEvents exposing (..)
 import Html exposing (..)
 import Html.Attributes as Attributes exposing (..)
 import Html.Events exposing (onBlur, onClick, onInput)
 import Http
 import Json.Decode as Json
-import ListUtils exposing (flip, getNextItem, removeItem, unpackMaybes)
 import Login
 import Process
 import Random
 import Set exposing (Set)
 import Task
+import Utils.ExtraEvents exposing (..)
+import Utils.ListUtils exposing (flip, getNextItem, removeItem, unpackMaybes)
 
 
 noComand : Model -> ( Model, Cmd msg )
