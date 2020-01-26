@@ -1,4 +1,4 @@
-module ExtraEvents exposing (..)
+module Utils.ExtraEvents exposing (..)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)

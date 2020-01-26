@@ -1,10 +1,10 @@
 port module Login exposing (..)
 
 import Browser.Navigation as Nav
-import ExtraEvents exposing (classIf, onClickIf)
 import Html exposing (Attribute, Html, a, button, div, h3, img, input, span, text)
 import Html.Attributes exposing (autofocus, class, classList, disabled, href, placeholder, src, tabindex, type_, value)
 import Html.Events exposing (onInput)
+import Utils.ExtraEvents exposing (classIf, onClickIf)
 
 
 port googleSignin : () -> Cmd msg
