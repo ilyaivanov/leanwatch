@@ -3,6 +3,7 @@ port module Board exposing (Item, Model, Msg(..), Stack, createBoard, init, onBo
 import Browser.Dom as Dom exposing (focus)
 import Dict exposing (Dict)
 import DictMoves exposing (Parent, getParentByChildren, moveItem, moveItemInList, moveItemToEnd)
+import DragState exposing (..)
 import Html exposing (..)
 import Html.Attributes as Attributes exposing (..)
 import Html.Events exposing (onBlur, onClick, onInput)
@@ -135,15 +136,6 @@ type alias Model =
     }
 
 
-type DragState
-    = NoDrag
-    | ItemPressedNotYetMoved MouseMoveEvent Offsets String
-    | BoardPressedNotYetMoved MouseMoveEvent Offsets String
-    | DraggingItem MouseMoveEvent Offsets String
-    | DraggingStack MouseMoveEvent Offsets String
-    | DraggingBoard MouseMoveEvent Offsets String
-
-
 type RenamingState
     = NoRename
     | RenamingItem { itemId : String, newName : String }
@@ -216,7 +208,7 @@ init =
         }
     , boardIdsToSync = Set.empty
     , needToSyncProfile = False
-    , dragState = NoDrag
+    , dragState = DragState.init
     , renamingState = NoRename
     , searchTerm = ""
     , currentSearchId = ""
@@ -257,59 +249,6 @@ type alias SearchResponse =
     }
 
 
-isDraggingStack : DragState -> String -> Bool
-isDraggingStack dragState stackId =
-    case dragState of
-        DraggingStack _ _ stackBeingDragged ->
-            stackBeingDragged == stackId
-
-        _ ->
-            False
-
-
-isDraggingBoard : DragState -> String -> Bool
-isDraggingBoard dragState boardId =
-    case dragState of
-        DraggingBoard _ _ boardBeingDragged ->
-            boardBeingDragged == boardId
-
-        _ ->
-            False
-
-
-isDraggingAnyBoard : DragState -> Bool
-isDraggingAnyBoard dragState =
-    case dragState of
-        DraggingBoard _ _ _ ->
-            True
-
-        _ ->
-            False
-
-
-isDraggingItem : DragState -> String -> Bool
-isDraggingItem dragState id =
-    case dragState of
-        DraggingItem _ _ itemBeingDragged ->
-            itemBeingDragged == id
-
-        _ ->
-            False
-
-
-isDraggingAnything : DragState -> Bool
-isDraggingAnything dragState =
-    case dragState of
-        NoDrag ->
-            False
-
-        ItemPressedNotYetMoved _ _ _ ->
-            False
-
-        _ ->
-            True
-
-
 getSearchStack : Model -> Maybe Stack
 getSearchStack model =
     model.stacks |> Dict.get "SEARCH"
@@ -327,8 +266,8 @@ getStackToView model stackId =
     ( stack, items )
 
 
-getItemById : String -> Model -> Maybe Item
-getItemById itemId model =
+getItemById : Model -> String -> Maybe Item
+getItemById model itemId =
     Dict.toList model.items
         |> List.map Tuple.second
         |> List.filter (\i -> i.id == itemId)
@@ -357,105 +296,60 @@ updateProfileAndMarkAsNeededToSync profile model =
     { model | userProfile = profile, needToSyncProfile = True }
 
 
+updateBoardsInProfile profile boards =
+    { profile | boards = boards }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        ItemMouseDown itemId { mousePosition, offsets } ->
-            noComand { model | dragState = ItemPressedNotYetMoved mousePosition offsets itemId }
+        ItemMouseDown itemId event ->
+            noComand { model | dragState = handleItemMouseDown itemId event }
 
-        BoardMouseDown itemId { mousePosition, offsets } ->
-            noComand { model | dragState = BoardPressedNotYetMoved mousePosition offsets itemId }
+        BoardMouseDown boardId event ->
+            noComand { model | dragState = handleBoardMouseDown boardId event }
+
+        StackTitleMouseDown stackId event ->
+            noComand { model | dragState = handleStackTitleMouseDown stackId event }
 
         MouseUp ->
-            case model.dragState of
-                ItemPressedNotYetMoved _ _ id ->
-                    let
-                        cmd =
-                            getItemById id model |> Maybe.map (\i -> play i.youtubeId) |> Maybe.withDefault Cmd.none
-                    in
-                    ( { model | dragState = NoDrag, videoBeingPlayed = Just id }, cmd )
+            let
+                ( nextDragState, item ) =
+                    handleMouseUp model.dragState
 
-                _ ->
-                    noComand { model | dragState = NoDrag }
-
-        StackTitleMouseDown stackId { mousePosition, offsets } ->
-            case model.renamingState of
-                --Ignore drag clicks during modification
-                RenamingItem _ ->
-                    noComand model
-
-                _ ->
-                    noComand { model | dragState = DraggingStack mousePosition offsets stackId }
+                nextCommand =
+                    item |> Maybe.andThen (getItemById model) |> Maybe.map .youtubeId |> Maybe.map play |> Maybe.withDefault Cmd.none
+            in
+            ( { model | dragState = nextDragState }, nextCommand )
 
         MouseMove newMousePosition ->
-            case ( model.dragState, newMousePosition.buttons ) of
-                ( DraggingStack _ offsets id, 1 ) ->
-                    noComand { model | dragState = DraggingStack newMousePosition offsets id }
-
-                ( ItemPressedNotYetMoved _ offsets id, 1 ) ->
-                    noComand { model | dragState = DraggingItem newMousePosition offsets id }
-
-                ( DraggingItem _ offsets id, 1 ) ->
-                    noComand { model | dragState = DraggingItem newMousePosition offsets id }
-
-                ( BoardPressedNotYetMoved _ offsets id, 1 ) ->
-                    noComand { model | dragState = DraggingBoard newMousePosition offsets id }
-
-                ( DraggingBoard _ offsets id, 1 ) ->
-                    noComand { model | dragState = DraggingBoard newMousePosition offsets id }
-
-                -- Any registered mouse move without mouse pressed is ending eny drag session
-                ( _, 0 ) ->
-                    noComand { model | dragState = NoDrag }
-
-                _ ->
-                    noComand model
+            noComand { model | dragState = handleMouseMove model.dragState newMousePosition }
 
         ItemEnterDuringDrag itemUnder ->
-            case model.dragState of
-                DraggingItem _ _ itemOver ->
-                    if itemOver == itemUnder then
-                        noComand model
-
-                    else
-                        { model | stacks = moveItem model.stacks { from = itemOver, to = itemUnder } } |> markSelectedBoardAsNeededToSync |> noComand
-
-                _ ->
-                    noComand model
+            handleItemEnter model.dragState itemUnder model.stacks
+                |> Maybe.map (\newStacks -> { model | stacks = newStacks })
+                |> Maybe.map markSelectedBoardAsNeededToSync
+                |> Maybe.withDefault model
+                |> noComand
 
         StackEnterDuringDrag stackUnder ->
-            case model.dragState of
-                DraggingStack _ _ stackOver ->
-                    { model | boards = moveItem model.boards { from = stackOver, to = stackUnder } } |> markSelectedBoardAsNeededToSync |> noComand
-
-                _ ->
-                    noComand model
-
-        BoardEnterDuringDrag boardUnder ->
-            case model.dragState of
-                DraggingBoard _ _ boardOver ->
-                    let
-                        profile =
-                            model.userProfile
-
-                        newOrder =
-                            moveItemInList model.userProfile.boards { from = boardOver, to = boardUnder }
-                    in
-                    noComand (updateProfileAndMarkAsNeededToSync { profile | boards = newOrder } model)
-
-                _ ->
-                    noComand model
+            handleStackEnter model.dragState stackUnder model.boards
+                |> Maybe.map (\newBoards -> { model | boards = newBoards })
+                |> Maybe.map markSelectedBoardAsNeededToSync
+                |> Maybe.withDefault model
+                |> noComand
 
         StackOverlayEnterDuringDrag stackUnder ->
-            case model.dragState of
-                DraggingStack _ _ stackOver ->
-                    { model | boards = moveItem model.boards { from = stackOver, to = stackUnder } } |> markSelectedBoardAsNeededToSync |> noComand
+            handleStackOverlayEnter model.dragState stackUnder model
+                |> Maybe.map markSelectedBoardAsNeededToSync
+                |> Maybe.withDefault model
+                |> noComand
 
-                DraggingItem _ _ itemOver ->
-                    { model | stacks = moveItemToEnd model.stacks { itemToMove = itemOver, targetParent = stackUnder } } |> markSelectedBoardAsNeededToSync |> noComand
-
-                _ ->
-                    noComand model
+        BoardEnterDuringDrag boardUnder ->
+            handleBoardEnter model.dragState boardUnder model.userProfile.boards
+                |> updateBoardsInProfile model.userProfile
+                |> flip updateProfileAndMarkAsNeededToSync model
+                |> noComand
 
         CreateStack newStackId ->
             { model
@@ -613,7 +507,7 @@ update msg model =
                 ( Just actualStack, Just videoPlayed ) ->
                     case getNextItem videoPlayed actualStack.children of
                         Just nextItemId ->
-                            case getItemById nextItemId model of
+                            case getItemById model nextItemId of
                                 Just nextItem ->
                                     ( { model | videoBeingPlayed = Just nextItem.id }, play nextItem.youtubeId )
 
