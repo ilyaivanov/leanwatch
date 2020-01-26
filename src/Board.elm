@@ -480,7 +480,7 @@ update msg model =
             let
                 request =
                     Http.get
-                        { url = "https://us-central1-lean-watch.cloudfunctions.net/getVideos?q=" ++ term
+                        { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?q=" ++ term
                         , expect = Http.expectJson GotItems decodeItems
                         }
             in
