@@ -320,7 +320,7 @@ update msg model =
                 nextCommand =
                     item |> Maybe.andThen (getItemById model) |> Maybe.map .youtubeId |> Maybe.map play |> Maybe.withDefault Cmd.none
             in
-            ( { model | dragState = nextDragState }, nextCommand )
+            ( { model | dragState = nextDragState, videoBeingPlayed = item }, nextCommand )
 
         MouseMove newMousePosition ->
             noComand { model | dragState = handleMouseMove model.dragState newMousePosition }
