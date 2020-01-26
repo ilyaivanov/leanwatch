@@ -1,7 +1,7 @@
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-function registerPorts(ports) {
+function registerFirebase(ports) {
   const provider = new firebase.auth.GoogleAuthProvider();
 
   auth.onAuthStateChanged(function (user) {
@@ -17,7 +17,9 @@ function registerPorts(ports) {
       ports.onLogout.send("ignored value");
   });
 
-  ports.googleSignin.subscribe(() => auth.signInWithPopup(provider));
+  ports.googleSignin.subscribe(() => auth.signInWithPopup(provider).then().catch(res => {
+    ports.onLoginCancel.send(null);
+  }));
   ports.logout.subscribe(() => auth.signOut());
 
   ports.saveBoard.subscribe(function (boards) {
@@ -55,12 +57,13 @@ function handleUserLogin(user, onSuccess) {
       onSuccess(profile);
     } else {
       const newBoard = db.collection('boards').doc();
+      console.log('Creating board', {...defaultBoard, id: newBoard.id});
       newBoard.set({...defaultBoard, id: newBoard.id});
       const newProfile = {
         id: userRef.id,
         boards: [newBoard.id],
         selectedBoard: newBoard.id,
-        syncTime: 1000 * 60,
+        syncTime: 1000 * 30,
       };
       console.log('Created profile ', newProfile);
       userRef.set(newProfile);
@@ -75,15 +78,15 @@ function handleUserLogin(user, onSuccess) {
 // and you can move item from the initial board to your initial board. This way you will have two items with the same id
 // Probability of this is super minimal
 const defaultBoard = {
-  name: "First Board",
+  name: "Your First Board",
   stacks: [
     {
       id: "STACK_1",
-      name: "FirstStack",
+      name: "Try dragging other stuff here",
       items: [
         {
           id: "ITEM_1",
-          name: "first item",
+          name: "You can create other columns and boards and find videos using 'Search'",
           youtubeId: "WddpRmmAYkg",
         },
       ],

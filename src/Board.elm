@@ -1,4 +1,4 @@
-port module Board exposing (Item, Model, Msg(..), Stack, createBoard, init, onBoardCreated, onBoardsLoaded, onUserProfileLoaded, update, view)
+port module Board exposing (Item, Model, Msg(..), Stack, createBoard, init, onBoardCreated, onBoardsLoaded, onUserProfileLoaded, onVideoEnded, update, view)
 
 import Browser.Dom as Dom exposing (focus)
 import Dict exposing (Dict)
@@ -9,7 +9,7 @@ import Html.Attributes as Attributes exposing (..)
 import Html.Events exposing (onBlur, onClick, onInput)
 import Http
 import Json.Decode as Json
-import ListUtils exposing (flip, removeItem, unpackMaybes)
+import ListUtils exposing (flip, getNextItem, removeItem, unpackMaybes)
 import Login
 import Process
 import Random
@@ -38,6 +38,12 @@ port createBoard : () -> Cmd msg
 
 
 port logout : () -> Cmd msg
+
+
+port play : String -> Cmd msg
+
+
+port onVideoEnded : (() -> msg) -> Sub msg
 
 
 port onBoardCreated : (BoardResponse -> msg) -> Sub msg
@@ -166,6 +172,7 @@ type Msg
     | OnSearchInput String
       -- Commands
     | CreateSingleId
+    | VideoEnded ()
       -- Debounced search
     | AttemptToSearch String
     | DebouncedSearch String String
@@ -362,7 +369,11 @@ update msg model =
         MouseUp ->
             case model.dragState of
                 ItemPressedNotYetMoved _ _ id ->
-                    noComand { model | dragState = NoDrag, videoBeingPlayed = Just id }
+                    let
+                        cmd =
+                            getItemById id model |> Maybe.map (\i -> play i.youtubeId) |> Maybe.withDefault Cmd.none
+                    in
+                    ( { model | dragState = NoDrag, videoBeingPlayed = Just id }, cmd )
 
                 _ ->
                     noComand { model | dragState = NoDrag }
@@ -469,7 +480,7 @@ update msg model =
             let
                 request =
                     Http.get
-                        { url = "https://us-central1-lean-watch.cloudfunctions.net/getVideos?q=" ++ term
+                        { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?q=" ++ term
                         , expect = Http.expectJson GotItems decodeItems
                         }
             in
@@ -538,7 +549,7 @@ update msg model =
                 newProfile =
                     { profile | selectedBoard = boardResponse.id, boards = profile.boards ++ [ boardResponse.id ] }
             in
-            ( mergeAndNormalizeResponse boardResponse model |> updateProfileAndMarkAsNeededToSync newProfile, Cmd.none )
+            ( mergeAndNormalizeResponse boardResponse model |> updateProfileAndMarkAsNeededToSync newProfile |> markSelectedBoardAsNeededToSync, Cmd.none )
 
         StartModifyingItem item ->
             ( { model | renamingState = RenamingItem item }, focus item.itemId |> Task.attempt FocusResult )
@@ -593,6 +604,28 @@ update msg model =
                 Nothing ->
                     noComand model
 
+        VideoEnded _ ->
+            let
+                stack =
+                    getParentByChildren (model.videoBeingPlayed |> Maybe.withDefault "") model.stacks
+            in
+            case ( stack, model.videoBeingPlayed ) of
+                ( Just actualStack, Just videoPlayed ) ->
+                    case getNextItem videoPlayed actualStack.children of
+                        Just nextItemId ->
+                            case getItemById nextItemId model of
+                                Just nextItem ->
+                                    ( { model | videoBeingPlayed = Just nextItem.id }, play nextItem.youtubeId )
+
+                                Nothing ->
+                                    ( model, Cmd.none )
+
+                        Nothing ->
+                            ( model, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
         Noop ->
             noComand model
 
@@ -617,15 +650,21 @@ saveModifiedItems model =
             else
                 Cmd.none
 
-        syncBoards =
-            Set.toList model.boardIdsToSync |> List.map (\boardId -> denormalizeBoard boardId model) |> unpackMaybes |> saveBoard
+        boardsToSync =
+            Set.toList model.boardIdsToSync |> List.map (\boardId -> denormalizeBoard boardId model) |> unpackMaybes
+
+        syncBoardsCmd =
+            if List.isEmpty boardsToSync then
+                Cmd.none
+
+            else
+                saveBoard boardsToSync
     in
-    ( { model | needToSyncProfile = False, boardIdsToSync = Set.empty }, Cmd.batch [ syncProfile, syncBoards ] )
+    ( { model | needToSyncProfile = False, boardIdsToSync = Set.empty }, Cmd.batch [ syncProfile, syncBoardsCmd ] )
 
 
 finishModification : Model -> Model
 finishModification model =
-    -- TODO: fogure out how to sync this to the backend
     case model.renamingState of
         RenamingItem { itemId, newName } ->
             { model
@@ -633,6 +672,7 @@ finishModification model =
                 , boards = updateName model.boards itemId newName
                 , stacks = updateName model.stacks itemId newName
             }
+                |> markSelectedBoardAsNeededToSync
 
         NoRename ->
             model
@@ -729,7 +769,7 @@ viewBoard model =
                         (board.children
                             |> List.map (\stackId -> Dict.get stackId model.stacks)
                             |> unpackMaybes
-                            |> List.map (\stack -> viewStack model.renamingState model.dragState [ class "column-board" ] (getStackToView model stack.id))
+                            |> List.map (\stack -> viewStack model [ class "column-board" ] (getStackToView model stack.id))
                         )
                         [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "Add column" ], div [ class "post-add-stack-space" ] [] ]
                     )
@@ -744,8 +784,8 @@ viewBoardBar { name } =
     div [ class "board-title" ] [ text name ]
 
 
-viewStack : RenamingState -> DragState -> List (Attribute Msg) -> ( Stack, List Item ) -> Html Msg
-viewStack modificationState dragState attributes ( { id, name }, items ) =
+viewStack : { a | renamingState : RenamingState, dragState : DragState, videoBeingPlayed : Maybe String } -> List (Attribute Msg) -> ( Stack, List Item ) -> Html Msg
+viewStack { renamingState, dragState, videoBeingPlayed } attributes ( { id, name }, items ) =
     div (List.append [ class "column-drag-overlay" ] attributes)
         [ div
             [ class "column"
@@ -753,7 +793,7 @@ viewStack modificationState dragState attributes ( { id, name }, items ) =
             , onMouseEnter (StackEnterDuringDrag id)
             ]
             [ div [ class "column-title", onMouseDown (StackTitleMouseDown id) ]
-                [ viewContent modificationState { id = id, name = name }
+                [ viewContent renamingState { id = id, name = name }
                 , div [ class "column-title-actions" ]
                     [ button [ onMouseDownAlwaysStopPropagation (StartModifyingItem { itemId = id, newName = name }), class "icon-button" ] [ img [ src "/icons/edit.svg" ] [] ]
                     , button [ onMouseDownAlwaysStopPropagation (RemoveStack id), class "icon-button" ] [ img [ src "/icons/delete.svg" ] [] ]
@@ -764,7 +804,7 @@ viewStack modificationState dragState attributes ( { id, name }, items ) =
                     [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag id) ] [] ]
 
                  else
-                    List.map (\item -> viewItem [] dragState item) items
+                    List.map (\item -> viewItem [] dragState videoBeingPlayed item) items
                 )
             ]
         , div [ class "column-footer", onMouseEnter (StackOverlayEnterDuringDrag id) ] []
@@ -799,20 +839,16 @@ viewSearch model =
                 Nothing ->
                     []
     in
-    [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick (SetSidebar Hidden), class "icon-button" ] [ img [ src "/icons/chevron.svg" ] [] ] ]
+    [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick (SetSidebar Hidden), class "icon-button hide-icon" ] [ img [ src "/icons/chevron.svg" ] [] ] ]
     , input [ class "sidebar-search-input", onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
-    , div [] (List.map (\item -> viewItem [] model.dragState item) items)
+    , div [] (List.map (\item -> viewItem [] model.dragState model.videoBeingPlayed item) items)
     ]
-
-
-
---+ model.userProfile.syncTime
 
 
 viewBoards model =
     [ div [ class "sidebar-header" ]
         [ h3 [] [ text ("Boards" ++ asteriskIf model.needToSyncProfile), viewSyncMessage model.userProfile ]
-        , button [ onClick (SetSidebar Hidden), class "icon-button" ] [ img [ src "/icons/chevron.svg" ] [] ]
+        , button [ onClick (SetSidebar Hidden), class "icon-button hide-icon" ] [ img [ src "/icons/chevron.svg" ] [] ]
         ]
     , div []
         (model.userProfile.boards
@@ -821,6 +857,7 @@ viewBoards model =
             |> List.map (\item -> viewBoardButton model.dragState model [] item)
         )
     , div [ class "add-board-container" ] [ button [ onClick CreateNewBoard, class "dark" ] [ text "Add board" ] ]
+    , div [ class "small-text" ] [ text "* - means board requires syncing" ]
     ]
 
 
@@ -879,12 +916,13 @@ viewContent modificationState { name, id } =
             text name
 
 
-viewItem : List (Attribute Msg) -> DragState -> Item -> Html Msg
-viewItem atts dragState { id, name, youtubeId } =
+viewItem : List (Attribute Msg) -> DragState -> Maybe String -> Item -> Html Msg
+viewItem atts dragState videoBeingPlayed { id, name, youtubeId } =
     div
         (List.append
             [ class "item"
             , classIf (isDraggingItem dragState id) "item-preview"
+            , classIf (Maybe.withDefault "" videoBeingPlayed == id) "active"
             ]
             atts
         )
@@ -895,6 +933,7 @@ viewItem atts dragState { id, name, youtubeId } =
         ]
 
 
+viewElementBeingDragged : Model -> Html Msg
 viewElementBeingDragged model =
     let
         getAttributes : MouseMoveEvent -> Offsets -> List (Attribute msg)
@@ -907,11 +946,11 @@ viewElementBeingDragged model =
     case model.dragState of
         DraggingItem mouseMoveEvent offsets itemId ->
             Dict.get itemId model.items
-                |> Maybe.map (viewItem (getAttributes mouseMoveEvent offsets) NoDrag)
+                |> Maybe.map (viewItem (getAttributes mouseMoveEvent offsets) NoDrag model.videoBeingPlayed)
                 |> Maybe.withDefault (div [] [])
 
         DraggingStack mouseMoveEvent offsets stackId ->
-            viewStack NoRename NoDrag (getAttributes mouseMoveEvent offsets) (getStackToView model stackId)
+            viewStack { renamingState = NoRename, dragState = NoDrag, videoBeingPlayed = model.videoBeingPlayed } (getAttributes mouseMoveEvent offsets) (getStackToView model stackId)
 
         DraggingBoard mouseMoveEvent offsets boardId ->
             model.boards
@@ -924,30 +963,6 @@ viewElementBeingDragged model =
 
 
 viewPlayer model =
-    case model.videoBeingPlayed of
-        Just videoId ->
-            let
-                item =
-                    getItemById videoId model
-            in
-            case item of
-                Just actualItem ->
-                    div [ class "player-container" ]
-                        [ iframe
-                            [ width 400
-                            , height 150
-                            , src ("https://www.youtube.com/embed/" ++ actualItem.youtubeId ++ "?autoplay=1")
-                            , attribute "frameborder" "0"
-                            , attribute "allowfullscreen" "true"
-                            , attribute "modestBranding" "1"
-                            , attribute "showinfo" "1"
-                            , attribute "allow" "accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                            ]
-                            []
-                        ]
-
-                Nothing ->
-                    div [] []
-
-        Nothing ->
-            div [] []
+    div [ class "player-container" ]
+        [ div [ id "youtubePlayer" ] []
+        ]

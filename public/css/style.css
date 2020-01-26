@@ -19,14 +19,16 @@
             100vh - var(--top-bar-height) - var(--board-header-height)
     );
     --column-height: calc(
-            100vh - var(--top-bar-height) - var(--item-padding) - var(--item-padding) -
+            100vh - var(--top-bar-height) - var(--item-padding) -
             var(--board-header-height)
     );
+
+    --primary-color: #838D91;
 }
 
 body {
     margin: 0;
-    background-color: #838D91;
+    background-color: var(--primary-color);
 }
 
 * {
@@ -39,7 +41,8 @@ body {
     padding-left: 20px;
     padding-right: 20px;
 }
-.post-add-stack-space{
+
+.post-add-stack-space {
     min-width: var(--item-padding);
 }
 
@@ -78,17 +81,21 @@ body {
     cursor: var(--drag-cursor);
     position: relative;
     border-radius: 2px;
-    background-color: rgba(0,0,0,.05);
-}
-.sidebar-boards-button:hover{
-    background-color: rgba(0,0,0,.10);
+    background-color: rgba(0, 0, 0, .05);
 }
 
-.sidebar-boards-button:active{
-    background-color: rgba(0,0,0,.15);
+.sidebar-boards-button:hover {
+    background-color: rgba(0, 0, 0, .10);
 }
+
+.sidebar-boards-button:active {
+    background-color: rgba(0, 0, 0, .15);
+}
+
 .sidebar-boards-button.active {
     font-weight: bold;
+    color: white;
+    background-color: var(--primary-color);
 }
 
 .sidebar-boards-button-actions {
@@ -97,35 +104,50 @@ body {
     position: absolute;
     right: 0;
 }
-button.dark{
+
+button.dark {
     color: white;
     font-weight: bold;
-    background-color: rgba(0,0,0,.33);
+    background-color: rgba(0, 0, 0, .33);
 }
-button.dark:hover{
-    background-color: rgba(0,0,0,.45);
+
+button.dark:hover {
+    background-color: rgba(0, 0, 0, .45);
 }
-button.dark:active{
-    background-color: rgba(0,0,0,.55);
+
+button.dark:active {
+    background-color: rgba(0, 0, 0, .55);
 }
-.add-board-container{
+
+.add-board-container {
     display: flex;
     justify-content: center;
     align-content: center;
+    margin-bottom: 10px;
 }
 
-.icon-button{
+.icon-button {
     display: flex;
     align-items: center;
     justify-content: center;
     background-color: transparent;
     filter: invert(35%) sepia(0%) saturate(0%) hue-rotate(7deg) brightness(96%) contrast(99%);
 }
-.icon-button:hover{
-    background-color: rgba(0,0,0,.10);
+
+.icon-button:hover {
+    background-color: rgba(0, 0, 0, .10);
 }
-.icon-button:active{
-    background-color: rgba(0,0,0,.15);
+
+.icon-button:active {
+    background-color: rgba(0, 0, 0, .15);
+}
+
+.icon-button:last-of-type {
+    margin-right: 8px;
+}
+
+.icon-button.hide-icon{
+    margin-right: 0;
 }
 
 .sidebar-boards-button:hover .sidebar-boards-button-actions {
@@ -136,7 +158,14 @@ button.dark:active{
     display: none;
 }
 
-.sidebar-search-input{
+.sidebar-boards-button.item-preview {
+    box-shadow: none;
+    border: none;
+    color: rgba(0, 0, 0, 0);
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-search-input {
     width: 100%;
     height: 32px;
     padding: 4px;
@@ -144,11 +173,10 @@ button.dark:active{
     font-size: 16px;
 }
 
-.small-text{
+.small-text {
     font-size: 12px;
     color: grey;
 }
-
 
 
 /* BOARD and STACKS */
@@ -195,11 +223,12 @@ button.dark:active{
 }
 
 .column {
+    max-height: var(--column-height);
+    max-width: var(--sidebar-width);
     background-color: #EBECF0;
     border-radius: 4px;
-    max-height: var(--column-height);
     overflow: auto;
-    box-shadow: 1px 2px 5px 0px rgba(0,0,0,0.53);
+    box-shadow: 1px 2px 5px 0px rgba(0, 0, 0, 0.53);
 }
 
 .column-board {
@@ -212,7 +241,7 @@ button.dark:active{
     user-select: none;
     cursor: var(--drag-cursor);
     position: relative;
-    color: rgba(0,0,0,0.8);
+    color: rgba(0, 0, 0, 0.8);
     font-weight: bold;
 }
 
@@ -226,6 +255,11 @@ button.dark:active{
 
 .column-title:hover .column-title-actions {
     display: flex;
+}
+
+/*Do not show tooltips when dragging some item over a tooltip area*/
+.board-during-drag .board .column-title-actions {
+    display: none;
 }
 
 .column-content {
@@ -257,10 +291,15 @@ button.dark:active{
     cursor: var(--drag-cursor);
     position: relative;
     border-radius: 4px;
-    box-shadow: 1px 2px 5px 0px rgba(0,0,0,0.53);
+    box-shadow: 1px 2px 5px 0 rgba(0, 0, 0, 0.53);
 }
 
-.item:first-of-type{
+.item.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.item:first-of-type {
     margin-top: 0;
 }
 
@@ -282,35 +321,29 @@ button.dark:active{
 }
 
 .item-preview .item-image {
-    visibility: hidden;
-}
-.item.item-preview{
-    box-shadow: none;
+    display: none;
 }
 
 .item-text {
     flex: 1;
-    /* https://smad.jmu.edu/shen/webtype/lineheight.html */
-    /* chosen by the simple eye to limit text to two lines */
-    /* I don't want to have a js implementation */
-    height: 33px;
-    align-self: center;
     overflow: hidden;
     padding-left: 6px;
     padding-right: 6px;
+    display: flex;
+    align-items: center;
     font-size: 14px;
 }
 
 .item-dragged {
     position: fixed;
     margin: 0;
-    padding: 0;
     pointer-events: none;
     transform: rotate(4deg);
     transition: transform 100ms;
 }
 
-.item-preview {
+.item.item-preview {
+    box-shadow: none;
     border: none;
     color: rgba(0, 0, 0, 0);
     background-color: rgba(0, 0, 0, 0.1);
@@ -358,7 +391,6 @@ button.active {
 .user-info-image {
     height: 32px;
     border-radius: 16px;
-    margin-left: 2px;
     margin-left: 10px;
 }
 
@@ -426,6 +458,7 @@ button.active {
     justify-content: center;
     align-items: center;
     cursor: var(--drag-cursor);
+    color: rgba(0, 0, 0, .8);
 }
 
 .button.flat {
