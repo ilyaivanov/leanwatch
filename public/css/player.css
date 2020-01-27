@@ -1,0 +1,22 @@
+.cinema-player {
+    height: calc((9 / 16) * 100vw);
+    max-height: calc(100vh - 169px);
+    min-height: 480px;
+    width: var(--board-width);
+    float: left;
+}
+
+.mini-player {
+    position: fixed;
+    right: 15px;
+    bottom: 15px;
+    width: 400px;
+    height: 150px;
+}
+
+
+.player-container {
+    position: fixed;
+    right: 15px;
+    bottom: 15px;
+}

@@ -16,8 +16,8 @@ function registerPlayer(ports) {
 
     function init(initialVideo) {
       return new YT.Player('youtubePlayer', {
-        height: '150',
-        width: '400',
+        height: '100%',
+        width: '100%',
         videoId: initialVideo,
         playerVars: {'autoplay': 1 /*, 'controls': 0 */},
         events: {
