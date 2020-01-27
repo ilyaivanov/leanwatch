@@ -4,8 +4,8 @@ module DragState exposing
     , getItemBeingDragged
     , handleBoardEnter
     , handleBoardMouseDown
-    , handleItemEnter
-    , handleItemMouseDown
+    , handleCardEnter
+    , handleCardMouseDown
     , handleMouseMove
     , handleMouseUp
     , handleStackEnter
@@ -14,9 +14,7 @@ module DragState exposing
     , init
     , isDraggingAnyBoard
     , isDraggingAnything
-    , isDraggingBoard
     , isDraggingItem
-    , isDraggingStack
     , shouldListenToMouseMoveEvents
     )
 
@@ -26,17 +24,14 @@ import Utils.ExtraEvents exposing (MouseDownEvent, MouseMoveEvent, Offsets)
 
 type DragState
     = NoDrag
-    | ItemPressedNotYetMoved MouseMoveEvent Offsets String
-    | BoardPressedNotYetMoved MouseMoveEvent Offsets String
-    | DraggingItem MouseMoveEvent Offsets String
-    | DraggingStack MouseMoveEvent Offsets String
-    | DraggingBoard MouseMoveEvent Offsets String
+    | PressedNotYetMoved ItemBeingDragged MouseMoveEvent Offsets String
+    | DraggingSomething ItemBeingDragged MouseMoveEvent Offsets String
 
 
 type ItemBeingDragged
     = BoardBeingDragged
     | StackBeingDragged
-    | ItemBeingDragged
+    | CardBeingDragged
 
 
 getElementOffsets mousePosition offsets =
@@ -47,14 +42,8 @@ getElementOffsets mousePosition offsets =
 
 getItemBeingDragged dragState =
     case dragState of
-        DraggingStack mouse offset id ->
-            Just ( StackBeingDragged, getElementOffsets mouse offset, id )
-
-        DraggingItem mouse offset id ->
-            Just ( ItemBeingDragged, getElementOffsets mouse offset, id )
-
-        DraggingBoard mouse offset id ->
-            Just ( BoardBeingDragged, getElementOffsets mouse offset, id )
+        DraggingSomething itemBeingDragged mouse offset id ->
+            Just ( itemBeingDragged, getElementOffsets mouse offset, id )
 
         _ ->
             Nothing
@@ -63,20 +52,11 @@ getItemBeingDragged dragState =
 handleMouseMove : DragState -> MouseMoveEvent -> DragState
 handleMouseMove dragState newMousePosition =
     case ( dragState, newMousePosition.buttons ) of
-        ( DraggingStack _ offsets id, 1 ) ->
-            DraggingStack newMousePosition offsets id
+        ( DraggingSomething itemType _ offsets id, 1 ) ->
+            DraggingSomething itemType newMousePosition offsets id
 
-        ( ItemPressedNotYetMoved _ offsets id, 1 ) ->
-            DraggingItem newMousePosition offsets id
-
-        ( DraggingItem _ offsets id, 1 ) ->
-            DraggingItem newMousePosition offsets id
-
-        ( BoardPressedNotYetMoved _ offsets id, 1 ) ->
-            DraggingBoard newMousePosition offsets id
-
-        ( DraggingBoard _ offsets id, 1 ) ->
-            DraggingBoard newMousePosition offsets id
+        ( PressedNotYetMoved itemType _ offsets id, 1 ) ->
+            DraggingSomething itemType newMousePosition offsets id
 
         -- Any registered mouse move without mouse pressed is ending eny drag session
         ( _, 0 ) ->
@@ -86,42 +66,42 @@ handleMouseMove dragState newMousePosition =
             dragState
 
 
-handleItemMouseDown : String -> MouseDownEvent -> DragState
-handleItemMouseDown itemId { mousePosition, offsets } =
-    ItemPressedNotYetMoved mousePosition offsets itemId
+handleCardMouseDown : String -> MouseDownEvent -> DragState
+handleCardMouseDown cardId { mousePosition, offsets } =
+    PressedNotYetMoved CardBeingDragged mousePosition offsets cardId
 
 
 handleBoardMouseDown : String -> MouseDownEvent -> DragState
 handleBoardMouseDown boardId { mousePosition, offsets } =
-    BoardPressedNotYetMoved mousePosition offsets boardId
+    PressedNotYetMoved BoardBeingDragged mousePosition offsets boardId
 
 
 handleStackTitleMouseDown : String -> MouseDownEvent -> DragState
 handleStackTitleMouseDown stackId { mousePosition, offsets } =
-    DraggingStack mousePosition offsets stackId
+    PressedNotYetMoved StackBeingDragged mousePosition offsets stackId
 
 
-handleItemEnter dragState itemUnder stacks =
+handleCardEnter dragState cardUnderId stacks =
     case dragState of
-        DraggingItem _ _ itemOver ->
-            if itemOver == itemUnder then
+        DraggingSomething itemType _ _ itemOverId ->
+            if itemOverId == cardUnderId || itemType /= CardBeingDragged then
                 Nothing
 
             else
-                Just (moveItem stacks { from = itemOver, to = itemUnder })
+                Just (moveItem stacks { from = itemOverId, to = cardUnderId })
 
         _ ->
             Nothing
 
 
-handleStackEnter dragState stackUnder boards =
+handleStackEnter dragState stackUnderId boards =
     case dragState of
-        DraggingStack _ _ stackOver ->
-            if stackOver == stackUnder then
+        DraggingSomething itemType _ _ itemOverId ->
+            if itemOverId == stackUnderId || itemType /= StackBeingDragged then
                 Nothing
 
             else
-                Just (moveItem boards { from = stackOver, to = stackUnder })
+                Just (moveItem boards { from = itemOverId, to = stackUnderId })
 
         _ ->
             Nothing
@@ -130,8 +110,13 @@ handleStackEnter dragState stackUnder boards =
 handleBoardEnter : DragState -> String -> List String -> Maybe (List String)
 handleBoardEnter dragState boardUnder boards =
     case dragState of
-        DraggingBoard _ _ boardOver ->
-            Just (moveItemInList boards { from = boardOver, to = boardUnder })
+        DraggingSomething itemType _ _ itemOverId ->
+            case itemType of
+                BoardBeingDragged ->
+                    Just (moveItemInList boards { from = itemOverId, to = boardUnder })
+
+                _ ->
+                    Nothing
 
         _ ->
             Nothing
@@ -139,11 +124,16 @@ handleBoardEnter dragState boardUnder boards =
 
 handleStackOverlayEnter dragState stackUnder partialModel =
     case dragState of
-        DraggingStack _ _ stackOver ->
-            Just { partialModel | boards = moveItem partialModel.boards { from = stackOver, to = stackUnder } }
+        DraggingSomething itemType _ _ itemOverId ->
+            case itemType of
+                StackBeingDragged ->
+                    Just { partialModel | boards = moveItem partialModel.boards { from = itemOverId, to = stackUnder } }
 
-        DraggingItem _ _ itemOver ->
-            Just { partialModel | stacks = moveItemToEnd partialModel.stacks { itemToMove = itemOver, targetParent = stackUnder } }
+                CardBeingDragged ->
+                    Just { partialModel | stacks = moveItemToEnd partialModel.stacks { itemToMove = itemOverId, targetParent = stackUnder } }
+
+                BoardBeingDragged ->
+                    Nothing
 
         _ ->
             Nothing
@@ -156,28 +146,18 @@ shouldListenToMouseMoveEvents dragState =
 handleMouseUp : DragState -> ( DragState, Maybe String )
 handleMouseUp dragState =
     case dragState of
-        ItemPressedNotYetMoved _ _ id ->
+        PressedNotYetMoved _ _ _ id ->
             ( NoDrag, Just id )
 
         _ ->
             ( NoDrag, Nothing )
 
 
-isDraggingStack : DragState -> String -> Bool
-isDraggingStack dragState stackId =
+isDraggingItem : DragState -> String -> Bool
+isDraggingItem dragState id =
     case dragState of
-        DraggingStack _ _ stackBeingDragged ->
-            stackBeingDragged == stackId
-
-        _ ->
-            False
-
-
-isDraggingBoard : DragState -> String -> Bool
-isDraggingBoard dragState boardId =
-    case dragState of
-        DraggingBoard _ _ boardBeingDragged ->
-            boardBeingDragged == boardId
+        DraggingSomething _ _ _ itemBeingDragged ->
+            itemBeingDragged == id
 
         _ ->
             False
@@ -186,18 +166,8 @@ isDraggingBoard dragState boardId =
 isDraggingAnyBoard : DragState -> Bool
 isDraggingAnyBoard dragState =
     case dragState of
-        DraggingBoard _ _ _ ->
-            True
-
-        _ ->
-            False
-
-
-isDraggingItem : DragState -> String -> Bool
-isDraggingItem dragState id =
-    case dragState of
-        DraggingItem _ _ itemBeingDragged ->
-            itemBeingDragged == id
+        DraggingSomething itemBeingDragged _ _ _ ->
+            itemBeingDragged == BoardBeingDragged
 
         _ ->
             False
@@ -206,14 +176,11 @@ isDraggingItem dragState id =
 isDraggingAnything : DragState -> Bool
 isDraggingAnything dragState =
     case dragState of
-        NoDrag ->
-            False
-
-        ItemPressedNotYetMoved _ _ _ ->
-            False
+        DraggingSomething _ _ _ _ ->
+            True
 
         _ ->
-            True
+            False
 
 
 init =

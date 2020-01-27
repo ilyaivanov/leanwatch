@@ -304,7 +304,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ItemMouseDown itemId event ->
-            noComand { model | dragState = handleItemMouseDown itemId event }
+            noComand { model | dragState = handleCardMouseDown itemId event }
 
         BoardMouseDown boardId event ->
             noComand { model | dragState = handleBoardMouseDown boardId event }
@@ -326,7 +326,7 @@ update msg model =
             noComand { model | dragState = handleMouseMove model.dragState newMousePosition }
 
         ItemEnterDuringDrag itemUnder ->
-            handleItemEnter model.dragState itemUnder model.stacks
+            handleCardEnter model.dragState itemUnder model.stacks
                 |> Maybe.map (\newStacks -> { model | stacks = newStacks })
                 |> Maybe.map markSelectedBoardAsNeededToSync
                 |> Maybe.withDefault model
@@ -684,7 +684,7 @@ viewStack { renamingState, dragState, videoBeingPlayed } attributes ( { id, name
     div (List.append [ class "column-drag-overlay" ] attributes)
         [ div
             [ class "column"
-            , classIf (isDraggingStack dragState id) "column-preview"
+            , classIf (isDraggingItem dragState id) "column-preview"
             , onMouseEnter (StackEnterDuringDrag id)
             ]
             [ div [ class "column-title", onMouseDown (StackTitleMouseDown id) ]
@@ -776,7 +776,7 @@ viewBoardButton dragState model attrs item =
             , onClickIf (not (isDraggingAnyBoard dragState)) (SelectBoard item.id)
             , onMouseDown (BoardMouseDown item.id)
             , onMouseEnter (BoardEnterDuringDrag item.id)
-            , classIf (isDraggingBoard dragState item.id) "item-preview"
+            , classIf (isDraggingItem dragState item.id) "item-preview"
             ]
             attrs
         )
@@ -838,7 +838,7 @@ viewElementBeingDragged model =
             ]
     in
     case getItemBeingDragged model.dragState of
-        Just ( ItemBeingDragged, elementPosition, itemId ) ->
+        Just ( CardBeingDragged, elementPosition, itemId ) ->
             Dict.get itemId model.items
                 |> Maybe.map (viewItem (getAttributes elementPosition) DragState.init model.videoBeingPlayed)
                 |> Maybe.withDefault (div [] [])
