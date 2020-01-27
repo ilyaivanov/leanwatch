@@ -2,7 +2,7 @@ module DictMoves exposing (..)
 
 import Dict exposing (Dict)
 import List.Extra exposing (findIndex, splitAt)
-import Utils.ListUtils exposing (removeItem)
+import Utils.Other exposing (removeItem)
 
 
 type alias Parent a =
