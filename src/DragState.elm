@@ -24,7 +24,7 @@ import Utils.ExtraEvents exposing (MouseDownEvent, MouseMoveEvent, Offsets)
 
 type DragState
     = NoDrag
-    | PressedNotYetMoved ItemBeingDragged MouseMoveEvent Offsets String
+    | PressedNotYetMoved ItemBeingDragged MouseMoveEvent Offsets String Float
     | DraggingSomething ItemBeingDragged MouseMoveEvent Offsets String
 
 
@@ -49,14 +49,36 @@ getItemBeingDragged dragState =
             Nothing
 
 
+getDistance : MouseMoveEvent -> MouseMoveEvent -> Float
+getDistance point1 point2 =
+    sqrt
+        (toFloat
+            ((point1.pageX - point2.pageX)
+                ^ 2
+                + (point1.pageY - point2.pageY)
+                ^ 2
+            )
+        )
+
+
 handleMouseMove : DragState -> MouseMoveEvent -> DragState
 handleMouseMove dragState newMousePosition =
     case ( dragState, newMousePosition.buttons ) of
         ( DraggingSomething itemType _ offsets id, 1 ) ->
             DraggingSomething itemType newMousePosition offsets id
 
-        ( PressedNotYetMoved itemType _ offsets id, 1 ) ->
-            DraggingSomething itemType newMousePosition offsets id
+        ( PressedNotYetMoved itemType previousPosition offsets id distance, 1 ) ->
+            let
+                newDistance =
+                    distance + getDistance previousPosition newMousePosition
+            in
+            --makes much a better UX - we need to drag at least 3 pixels in order to count as drag
+            --otherwise this is considered a click (play if clicking on a card)
+            if newDistance > 3 then
+                DraggingSomething itemType newMousePosition offsets id
+
+            else
+                PressedNotYetMoved itemType newMousePosition offsets id newDistance
 
         -- Any registered mouse move without mouse pressed is ending eny drag session
         ( _, 0 ) ->
@@ -68,17 +90,17 @@ handleMouseMove dragState newMousePosition =
 
 handleCardMouseDown : String -> MouseDownEvent -> DragState
 handleCardMouseDown cardId { mousePosition, offsets } =
-    PressedNotYetMoved CardBeingDragged mousePosition offsets cardId
+    PressedNotYetMoved CardBeingDragged mousePosition offsets cardId 0
 
 
 handleBoardMouseDown : String -> MouseDownEvent -> DragState
 handleBoardMouseDown boardId { mousePosition, offsets } =
-    PressedNotYetMoved BoardBeingDragged mousePosition offsets boardId
+    PressedNotYetMoved BoardBeingDragged mousePosition offsets boardId 0
 
 
 handleStackTitleMouseDown : String -> MouseDownEvent -> DragState
 handleStackTitleMouseDown stackId { mousePosition, offsets } =
-    PressedNotYetMoved StackBeingDragged mousePosition offsets stackId
+    PressedNotYetMoved StackBeingDragged mousePosition offsets stackId 0
 
 
 handleCardEnter dragState cardUnderId stacks =
@@ -146,7 +168,7 @@ shouldListenToMouseMoveEvents dragState =
 handleMouseUp : DragState -> ( DragState, Maybe String )
 handleMouseUp dragState =
     case dragState of
-        PressedNotYetMoved _ _ _ id ->
+        PressedNotYetMoved _ _ _ id _ ->
             ( NoDrag, Just id )
 
         _ ->
