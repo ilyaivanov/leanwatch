@@ -1,4 +1,4 @@
-module Utils.ListUtils exposing (..)
+module Utils.Other exposing (..)
 
 import List.Extra as LE exposing (..)
 
@@ -22,3 +22,12 @@ getNextItem item list =
         |> LE.elemIndex item
         |> Maybe.map ((+) 1)
         |> Maybe.andThen (\i -> LE.getAt i list)
+
+
+ifNothing maybeToCheck otherMaybe =
+    case maybeToCheck of
+        Just a ->
+            Just a
+
+        Nothing ->
+            otherMaybe

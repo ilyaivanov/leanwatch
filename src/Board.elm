@@ -15,7 +15,7 @@ import Random
 import Set exposing (Set)
 import Task
 import Utils.ExtraEvents exposing (..)
-import Utils.ListUtils exposing (flip, getNextItem, removeItem, unpackMaybes)
+import Utils.Other exposing (flip, getNextItem, ifNothing, removeItem, unpackMaybes)
 
 
 noComand : Model -> ( Model, Cmd msg )
@@ -319,8 +319,11 @@ update msg model =
 
                 nextCommand =
                     item |> Maybe.andThen (getItemById model) |> Maybe.map .youtubeId |> Maybe.map play |> Maybe.withDefault Cmd.none
+
+                nextVideo =
+                    ifNothing item model.videoBeingPlayed
             in
-            ( { model | dragState = nextDragState, videoBeingPlayed = item }, nextCommand )
+            ( { model | dragState = nextDragState, videoBeingPlayed = nextVideo }, nextCommand )
 
         MouseMove newMousePosition ->
             noComand { model | dragState = handleMouseMove model.dragState newMousePosition }
