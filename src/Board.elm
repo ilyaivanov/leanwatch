@@ -347,8 +347,9 @@ update msg model =
 
         BoardEnterDuringDrag boardUnder ->
             handleBoardEnter model.dragState boardUnder model.userProfile.boards
-                |> updateBoardsInProfile model.userProfile
-                |> flip updateProfileAndMarkAsNeededToSync model
+                |> Maybe.map (updateBoardsInProfile model.userProfile)
+                |> Maybe.map (flip updateProfileAndMarkAsNeededToSync model)
+                |> Maybe.withDefault model
                 |> noComand
 
         CreateStack newStackId ->
@@ -614,8 +615,8 @@ view model login =
 
         _ ->
             div
-                [ attributeIf (model.dragState /= NoDrag) (onMouseMove MouseMove)
-                , attributeIf (model.dragState /= NoDrag) (onMouseUp MouseUp)
+                [ attributeIf (shouldListenToMouseMoveEvents model.dragState) (onMouseMove MouseMove)
+                , attributeIf (shouldListenToMouseMoveEvents model.dragState) (onMouseUp MouseUp)
                 , classIf (isDraggingAnything model.dragState) "board-during-drag"
                 ]
                 [ viewTopBar model login
@@ -830,29 +831,28 @@ viewItem atts dragState videoBeingPlayed { id, name, youtubeId } =
 viewElementBeingDragged : Model -> Html Msg
 viewElementBeingDragged model =
     let
-        getAttributes : MouseMoveEvent -> Offsets -> List (Attribute msg)
-        getAttributes mouseMoveEvent offsets =
+        getAttributes elementPosition =
             [ class "item-dragged"
-            , style "left" (String.fromInt (mouseMoveEvent.pageX - offsets.offsetX) ++ "px")
-            , style "top" (String.fromInt (mouseMoveEvent.pageY - offsets.offsetY) ++ "px")
+            , style "left" (String.fromInt elementPosition.left ++ "px")
+            , style "top" (String.fromInt elementPosition.top ++ "px")
             ]
     in
-    case model.dragState of
-        DraggingItem mouseMoveEvent offsets itemId ->
+    case getItemBeingDragged model.dragState of
+        Just ( ItemBeingDragged, elementPosition, itemId ) ->
             Dict.get itemId model.items
-                |> Maybe.map (viewItem (getAttributes mouseMoveEvent offsets) NoDrag model.videoBeingPlayed)
+                |> Maybe.map (viewItem (getAttributes elementPosition) DragState.init model.videoBeingPlayed)
                 |> Maybe.withDefault (div [] [])
 
-        DraggingStack mouseMoveEvent offsets stackId ->
-            viewStack { renamingState = NoRename, dragState = NoDrag, videoBeingPlayed = model.videoBeingPlayed } (getAttributes mouseMoveEvent offsets) (getStackToView model stackId)
+        Just ( StackBeingDragged, elementPosition, stackId ) ->
+            viewStack { renamingState = NoRename, dragState = DragState.init, videoBeingPlayed = model.videoBeingPlayed } (getAttributes elementPosition) (getStackToView model stackId)
 
-        DraggingBoard mouseMoveEvent offsets boardId ->
+        Just ( BoardBeingDragged, elementPosition, boardId ) ->
             model.boards
                 |> Dict.get boardId
-                |> Maybe.map (viewBoardButton NoDrag model (getAttributes mouseMoveEvent offsets))
+                |> Maybe.map (viewBoardButton DragState.init model (getAttributes elementPosition))
                 |> Maybe.withDefault (div [] [])
 
-        _ ->
+        Nothing ->
             div [] []
 
 
