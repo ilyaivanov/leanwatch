@@ -130,6 +130,7 @@ type alias Model =
     , boardIdsToSync : Set String
     , needToSyncProfile : Bool
     , searchTerm : String
+    , isWaitingForSearch : Bool
 
     -- Used to debounce search on input
     , currentSearchId : String
@@ -208,6 +209,7 @@ init =
         }
     , boardIdsToSync = Set.empty
     , needToSyncProfile = False
+    , isWaitingForSearch = False
     , dragState = DragState.init
     , renamingState = NoRename
     , searchTerm = ""
@@ -383,20 +385,10 @@ update msg model =
                         }
             in
             if id == model.currentSearchId then
-                ( { model | currentSearchId = "" }, request )
+                ( { model | currentSearchId = "", isWaitingForSearch = True }, request )
 
             else
                 ( model, Cmd.none )
-
-        SaveModifiedItemsOnDemand ->
-            saveModifiedItems model
-
-        SaveModifiedItemsScheduled ->
-            let
-                ( newModel, cmds ) =
-                    saveModifiedItems model
-            in
-            ( newModel, Cmd.batch [ cmds, scheduleNextSync model.userProfile.syncTime ] )
 
         GotItems response ->
             case response of
@@ -411,10 +403,21 @@ update msg model =
                         itemsUpdated =
                             Dict.union newItemsDict model.items
                     in
-                    noComand { model | stacks = Dict.update "SEARCH" (\_ -> Just { id = "SEARCH", name = "New Stack", children = ids }) model.stacks, items = itemsUpdated }
+                    noComand { model | stacks = Dict.update "SEARCH" (\_ -> Just { id = "SEARCH", name = "New Stack", children = ids }) model.stacks, items = itemsUpdated, isWaitingForSearch = False }
 
                 _ ->
-                    noComand model
+                    -- Handle errors
+                    noComand { model | isWaitingForSearch = False }
+
+        SaveModifiedItemsOnDemand ->
+            saveModifiedItems model
+
+        SaveModifiedItemsScheduled ->
+            let
+                ( newModel, cmds ) =
+                    saveModifiedItems model
+            in
+            ( newModel, Cmd.batch [ cmds, scheduleNextSync model.userProfile.syncTime ] )
 
         SetSidebar state ->
             noComand { model | sidebarState = state }
@@ -740,6 +743,11 @@ viewSearch model =
     [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick (SetSidebar Hidden), class "icon-button hide-icon" ] [ img [ src "/icons/chevron.svg" ] [] ] ]
     , input [ class "sidebar-search-input", onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
     , div [] (List.map (\item -> viewItem [] model.dragState model.videoBeingPlayed item) items)
+    , if model.isWaitingForSearch then
+        progress [ class "material-progress-linear" ] []
+
+      else
+        div [] []
     ]
 
 
