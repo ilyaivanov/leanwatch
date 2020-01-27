@@ -713,7 +713,7 @@ viewSidebar : Model -> Html Msg
 viewSidebar model =
     case model.sidebarState of
         Search ->
-            div [ class "sidebar sidebar-padded" ]
+            div [ class "sidebar" ]
                 (viewSearch model)
 
         Boards ->

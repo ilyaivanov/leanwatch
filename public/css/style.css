@@ -63,11 +63,14 @@ body {
     padding: var(--item-padding);
     padding-top: 0;
 
-
-    /*without positioning relative and z-index shadow in drawn under stacks and cards :(*/
     box-shadow: 1px 2px 5px 0px rgba(0, 0, 0, 0.53);
+    /*without this shadow is drawn under the stacks and cards*/
+    z-index: 100;
     position: relative;
-    z-index: 99999;
+}
+.sidebar-boards-button.item-dragged {
+    /*Need to fix z-index on the .sidebar*/
+    z-index: 101;
 }
 
 .sidebar-header {
