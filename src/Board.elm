@@ -2,7 +2,7 @@ port module Board exposing (Item, Model, Msg(..), Stack, createBoard, init, onBo
 
 import Browser.Dom as Dom exposing (focus)
 import Dict exposing (Dict)
-import DictMoves exposing (Parent, getParentByChildren, moveItem, moveItemInList, moveItemToEnd)
+import DictMoves exposing (Parent, getParentByChildren)
 import DragState exposing (..)
 import Html exposing (..)
 import Html.Attributes as Attributes exposing (..)
