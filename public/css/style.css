@@ -307,6 +307,13 @@ button.dark:active {
     border-radius: 4px;
     box-shadow: 1px 2px 5px 0 rgba(0, 0, 0, 0.53);
 }
+.item:hover{
+    background-color: #ebebeb;
+}
+.item.item-dragged {
+    background-color: #ebebeb;
+    z-index: 102;
+}
 
 .item.active {
     background-color: var(--primary-color);
