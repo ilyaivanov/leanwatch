@@ -1,5 +1,7 @@
 module DragState exposing
-    ( DragState(..)
+    ( DragState
+    , ItemBeingDragged(..)
+    , getItemBeingDragged
     , handleBoardEnter
     , handleBoardMouseDown
     , handleItemEnter
@@ -15,6 +17,7 @@ module DragState exposing
     , isDraggingBoard
     , isDraggingItem
     , isDraggingStack
+    , shouldListenToMouseMoveEvents
     )
 
 import DictMoves exposing (moveItem, moveItemInList, moveItemToEnd)
@@ -28,6 +31,33 @@ type DragState
     | DraggingItem MouseMoveEvent Offsets String
     | DraggingStack MouseMoveEvent Offsets String
     | DraggingBoard MouseMoveEvent Offsets String
+
+
+type ItemBeingDragged
+    = BoardBeingDragged
+    | StackBeingDragged
+    | ItemBeingDragged
+
+
+getElementOffsets mousePosition offsets =
+    { top = mousePosition.pageY - offsets.offsetY
+    , left = mousePosition.pageX - offsets.offsetX
+    }
+
+
+getItemBeingDragged dragState =
+    case dragState of
+        DraggingStack mouse offset id ->
+            Just ( StackBeingDragged, getElementOffsets mouse offset, id )
+
+        DraggingItem mouse offset id ->
+            Just ( ItemBeingDragged, getElementOffsets mouse offset, id )
+
+        DraggingBoard mouse offset id ->
+            Just ( BoardBeingDragged, getElementOffsets mouse offset, id )
+
+        _ ->
+            Nothing
 
 
 handleMouseMove : DragState -> MouseMoveEvent -> DragState
@@ -97,14 +127,14 @@ handleStackEnter dragState stackUnder boards =
             Nothing
 
 
-handleBoardEnter : DragState -> String -> List String -> List String
+handleBoardEnter : DragState -> String -> List String -> Maybe (List String)
 handleBoardEnter dragState boardUnder boards =
     case dragState of
         DraggingBoard _ _ boardOver ->
-            moveItemInList boards { from = boardOver, to = boardUnder }
+            Just (moveItemInList boards { from = boardOver, to = boardUnder })
 
         _ ->
-            boards
+            Nothing
 
 
 handleStackOverlayEnter dragState stackUnder partialModel =
@@ -117,6 +147,10 @@ handleStackOverlayEnter dragState stackUnder partialModel =
 
         _ ->
             Nothing
+
+
+shouldListenToMouseMoveEvents dragState =
+    dragState /= NoDrag
 
 
 handleMouseUp : DragState -> ( DragState, Maybe String )
