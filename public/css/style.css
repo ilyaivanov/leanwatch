@@ -23,7 +23,9 @@
             var(--board-header-height)
     );
 
-    --primary-color: #838D91;
+    --primary-color: rgb(131,141,145);
+    --stack-color: #EBECF0;
+    --search-background: #d9dade;
 }
 
 body {
@@ -56,7 +58,7 @@ body {
 
 .sidebar {
     float: left;
-    background-color: #EBECF0;
+    background-color: var(--stack-color);
     overflow: auto;
     width: var(--sidebar-width);
     height: var(--board-height);
@@ -237,7 +239,7 @@ button.dark:active {
 .column {
     max-height: var(--column-height);
     max-width: var(--sidebar-width);
-    background-color: #EBECF0;
+    background-color: var(--stack-color);
     border-radius: 4px;
     overflow: auto;
     box-shadow: 1px 2px 5px 0px rgba(0, 0, 0, 0.53);

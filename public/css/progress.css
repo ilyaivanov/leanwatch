@@ -1,0 +1,45 @@
+/*copied from https://codepen.io/finnhvman/pen/OBLZRX*/
+.material-progress-linear {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    border: none;
+    height: 0.25em;
+    color: var(--primary-color);
+    background-color: var(--search-background);
+    font-size: 16px;
+}
+
+.material-progress-linear::-webkit-progress-bar {
+    background-color: transparent;
+}
+
+/* Indeterminate */
+.material-progress-linear:indeterminate {
+    background-size: 200% 100%;
+    background-image: linear-gradient(to right, transparent 50%, currentColor 50%, currentColor 60%, transparent 60%, transparent 71.5%, currentColor 71.5%, currentColor 84%, transparent 84%);
+    animation: material-progress-linear 2s infinite linear;
+}
+
+.material-progress-linear:indeterminate::-moz-progress-bar {
+    background-color: transparent;
+}
+
+.material-progress-linear:indeterminate::-ms-fill {
+    animation-name: none;
+}
+
+@keyframes material-progress-linear {
+    0% {
+        background-size: 200% 100%;
+        background-position: left -31.25% top 0%;
+    }
+    50% {
+        background-size: 800% 100%;
+        background-position: left -49% top 0%;
+    }
+    100% {
+        background-size: 400% 100%;
+        background-position: left -102% top 0%;
+    }
+}
