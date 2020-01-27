@@ -31,3 +31,12 @@ ifNothing maybeToCheck otherMaybe =
 
         Nothing ->
             otherMaybe
+
+
+maybeHasValue maybe =
+    case maybe of
+        Just _ ->
+            True
+
+        Nothing ->
+            False

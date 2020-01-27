@@ -9,6 +9,8 @@
     --top-bar-height: 40px;
     --drag-cursor: pointer;
     --sidebar-width: calc(var(--item-width) + var(--double-item-padding));
+    --sidebar-height: calc(100vh - var(--top-bar-height));
+    --sidebar-height-with-player: calc(100vh - var(--top-bar-height) + (9 / 16) * 100vw);
     --board-width: 100vw;
     --board-width-with-sidebar: calc(
             100vw - var(--item-width) - var(--double-item-padding)
@@ -48,11 +50,6 @@ body {
     min-width: var(--item-padding);
 }
 
-.player-container {
-    position: fixed;
-    right: 15px;
-    bottom: 15px;
-}
 
 /* SIDEBAR */
 
@@ -61,7 +58,7 @@ body {
     background-color: var(--stack-color);
     overflow: auto;
     width: var(--sidebar-width);
-    height: var(--board-height);
+    height: var(--sidebar-height);
     padding: var(--item-padding);
     padding-top: 0;
 
@@ -69,6 +66,9 @@ body {
     /*without this shadow is drawn under the stacks and cards*/
     z-index: 100;
     position: relative;
+}
+.sidebar-with-cinema-player{
+    --sidebar-height: var(--sidebar-height-with-player);
 }
 .sidebar-boards-button.item-dragged {
     /*Need to fix z-index on the .sidebar*/

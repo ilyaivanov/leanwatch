@@ -15,7 +15,7 @@ import Random
 import Set exposing (Set)
 import Task
 import Utils.ExtraEvents exposing (..)
-import Utils.Other exposing (flip, getNextItem, ifNothing, removeItem, unpackMaybes)
+import Utils.Other exposing (flip, getNextItem, ifNothing, maybeHasValue, removeItem, unpackMaybes)
 
 
 noComand : Model -> ( Model, Cmd msg )
@@ -131,6 +131,7 @@ type alias Model =
     , needToSyncProfile : Bool
     , searchTerm : String
     , isWaitingForSearch : Bool
+    , playerMode : PlayerMode
 
     -- Used to debounce search on input
     , currentSearchId : String
@@ -146,6 +147,11 @@ type SidebarState
     = Hidden
     | Search
     | Boards
+
+
+type PlayerMode
+    = MiniPlayer
+    | CinemaPlayer
 
 
 type Msg
@@ -178,6 +184,7 @@ type Msg
     | BoardsLoaded (List BoardResponse)
     | OnBoardCreated BoardResponse
     | CreateNewBoard
+    | TogglePlayerMode
     | RemoveBoard String
     | RemoveStack String
     | StartModifyingItem { itemId : String, newName : String }
@@ -216,6 +223,7 @@ init =
     , currentSearchId = ""
     , videoBeingPlayed = Nothing
     , sidebarState = Boards
+    , playerMode = MiniPlayer
     }
 
 
@@ -527,6 +535,17 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
+        TogglePlayerMode ->
+            let
+                nextPlayerState =
+                    if model.playerMode == CinemaPlayer then
+                        MiniPlayer
+
+                    else
+                        CinemaPlayer
+            in
+            { model | playerMode = nextPlayerState } |> noComand
+
         Noop ->
             noComand model
 
@@ -628,9 +647,9 @@ view model login =
                 [ viewTopBar model login
                 , div []
                     [ viewSidebar model
+                    , viewPlayer model
                     , viewBoard model
                     ]
-                , viewPlayer model
                 , viewElementBeingDragged model
                 ]
 
@@ -642,9 +661,27 @@ viewTopBar model login =
             [ button [ classIf (model.sidebarState == Boards) "active", onClick (SetSidebar Boards) ] [ text "Boards" ]
             , button [ classIf (model.sidebarState == Search) "active", onClick (SetSidebar Search) ] [ text "Search" ]
             ]
-        , button [ onClick SaveModifiedItemsOnDemand ] [ text "Save" ]
+        , div []
+            [ button [ onClick SaveModifiedItemsOnDemand ] [ text "Save" ]
+            , button [ onClick TogglePlayerMode ]
+                [ if model.playerMode == CinemaPlayer then
+                    text "Mini-player Mode"
+
+                  else
+                    text "Cinema Mode"
+                ]
+            ]
         , Maybe.map viewUser login |> Maybe.withDefault (div [] [])
         ]
+
+
+viewPlayer model =
+    div
+        [ classIf (model.sidebarState /= Hidden) "board-with-sidebar"
+        , classIf (hasCinemaVideo model) "cinema-player"
+        , classIf (model.playerMode == MiniPlayer) "mini-player"
+        ]
+        [ div [ id "youtubePlayer" ] [] ]
 
 
 viewUser : Login.LoginSuccessResponse -> Html Msg
@@ -716,15 +753,19 @@ viewSidebar : Model -> Html Msg
 viewSidebar model =
     case model.sidebarState of
         Search ->
-            div [ class "sidebar" ]
+            div [ class "sidebar", classIf (hasCinemaVideo model) "sidebar-with-cinema-player" ]
                 (viewSearch model)
 
         Boards ->
-            div [ class "sidebar" ]
+            div [ class "sidebar", classIf (hasCinemaVideo model) "sidebar-with-cinema-player" ]
                 (viewBoards model)
 
         Hidden ->
             div [] []
+
+
+hasCinemaVideo model =
+    model.playerMode == CinemaPlayer && maybeHasValue model.videoBeingPlayed
 
 
 viewSearch model =
@@ -865,9 +906,3 @@ viewElementBeingDragged model =
 
         Nothing ->
             div [] []
-
-
-viewPlayer model =
-    div [ class "player-container" ]
-        [ div [ id "youtubePlayer" ] []
-        ]
