@@ -647,7 +647,6 @@ view model login =
                 [ viewTopBar model login
                 , div []
                     [ viewSidebar model
-                    , viewPlayer model
                     , viewBoard model
                     ]
                 , viewElementBeingDragged model
@@ -700,7 +699,8 @@ viewBoard model =
                 [ class "board"
                 , classIf (model.sidebarState /= Hidden) "board-with-sidebar"
                 ]
-                [ viewBoardBar board
+                [ viewPlayer model
+                , viewBoardBar board
                 , div
                     [ class "columns-container" ]
                     (List.append
@@ -753,11 +753,11 @@ viewSidebar : Model -> Html Msg
 viewSidebar model =
     case model.sidebarState of
         Search ->
-            div [ class "sidebar", classIf (hasCinemaVideo model) "sidebar-with-cinema-player" ]
+            div [ class "sidebar" ]
                 (viewSearch model)
 
         Boards ->
-            div [ class "sidebar", classIf (hasCinemaVideo model) "sidebar-with-cinema-player" ]
+            div [ class "sidebar" ]
                 (viewBoards model)
 
         Hidden ->
