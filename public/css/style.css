@@ -28,6 +28,10 @@
     --primary-color: rgb(131,141,145);
     --stack-color: #EBECF0;
     --search-background: #d9dade;
+
+
+    --card-progress-height: 3px;
+    --card-image-width: 66px;
 }
 
 body {
