@@ -63,11 +63,18 @@ formatTime time =
             else
                 ""
 
-        minutesFormatted =
-            if minutes < 10 then
-                "0" ++ String.fromInt minutes
+        padSection value =
+            if value < 10 then
+                "0" ++ String.fromInt value
 
             else
-                String.fromInt minutes
+                String.fromInt value
+
+        padIf condition value =
+            if condition then
+                padSection value
+
+            else
+                String.fromInt value
     in
-    hoursPrefix ++ minutesFormatted ++ ":" ++ String.fromInt seconds
+    hoursPrefix ++ padIf (hours > 0) minutes ++ ":" ++ padSection seconds
