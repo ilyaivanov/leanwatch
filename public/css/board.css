@@ -105,7 +105,7 @@
 /* CARDS */
 
 .item {
-    height: 48px;
+    height: var(--item-height);
     width: var(--item-width);
     background-color: white;
     display: flex;
@@ -115,9 +115,11 @@
     border-radius: 4px;
     box-shadow: 1px 2px 5px 0 rgba(0, 0, 0, 0.53);
 }
-.item:hover{
+
+.item:hover {
     background-color: #ebebeb;
 }
+
 .item.item-dragged {
     background-color: #ebebeb;
     z-index: 102;
@@ -143,6 +145,34 @@
     bottom: 0;
     left: 0;
     right: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+}
+
+.click1 {
+    flex: 1;
+}
+
+.item-click-overlay:hover .item-icon-area {
+    display: flex;
+}
+
+.item-icon-area {
+    width: var(--item-height);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    border-bottom-right-radius: 4px;
+    border-top-right-radius: 4px;
+}
+
+.item-icon-area:hover {
+    background-color: #e1e1e1;
+}
+
+.item-icon-area:active {
+    background-color: #d7d7d7;
 }
 
 .item-preview .item-image {

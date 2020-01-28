@@ -132,6 +132,7 @@ type alias Model =
     , searchTerm : String
     , isWaitingForSearch : Bool
     , isLoadingMoreItems : Bool
+    , isLoadingSimilar : Bool
     , searchNextPageToken : String
     , playerMode : PlayerMode
 
@@ -149,6 +150,7 @@ type SidebarState
     = Hidden
     | Search
     | Boards
+    | Similar
 
 
 type PlayerMode
@@ -177,8 +179,9 @@ type Msg
       -- Debounced search
     | AttemptToSearch String
     | DebouncedSearch String String
-    | GotItems Bool (Result Http.Error SearchResponse)
+    | GotItems Bool String (Result Http.Error SearchResponse)
     | LoadMoreSearch
+    | SearchSimilar Item
       -- Sidebar
     | SetSidebar SidebarState
       -- Board Management
@@ -221,6 +224,7 @@ init =
     , needToSyncProfile = False
     , isWaitingForSearch = False
     , isLoadingMoreItems = False
+    , isLoadingSimilar = False
     , searchNextPageToken = ""
     , dragState = DragState.init
     , renamingState = NoRename
@@ -265,9 +269,14 @@ type alias SearchResponse =
     }
 
 
-getSearchStack : Model -> Maybe Stack
-getSearchStack model =
-    model.stacks |> Dict.get "SEARCH"
+getItemsForStack : String -> Model -> List Item
+getItemsForStack stackName model =
+    model.stacks
+        |> Dict.get stackName
+        |> Maybe.map .children
+        |> Maybe.withDefault []
+        |> List.map (\itemId -> Dict.get itemId model.items)
+        |> unpackMaybes
 
 
 getStackToView : Model -> String -> ( Stack, List Item )
@@ -395,7 +404,7 @@ update msg model =
                 request =
                     Http.get
                         { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?q=" ++ term
-                        , expect = Http.expectJson (GotItems False) decodeItems
+                        , expect = Http.expectJson (GotItems False "SEARCH") decodeItems
                         }
             in
             if id == model.currentSearchId then
@@ -404,7 +413,7 @@ update msg model =
             else
                 ( model, Cmd.none )
 
-        GotItems needToAppend response ->
+        GotItems needToAppend stackType response ->
             case response of
                 Ok body ->
                     let
@@ -419,17 +428,20 @@ update msg model =
 
                         updateChildren nextItems =
                             if needToAppend then
-                                List.append (Dict.get "SEARCH" model.stacks |> Maybe.map .children |> Maybe.withDefault []) nextItems
+                                List.append (Dict.get stackType model.stacks |> Maybe.map .children |> Maybe.withDefault []) nextItems
 
                             else
                                 ids
                     in
                     noComand
                         { model
-                            | stacks = Dict.update "SEARCH" (\_ -> Just { id = "SEARCH", name = "New Stack", children = updateChildren ids }) model.stacks
+                            | stacks = Dict.update stackType (\_ -> Just { id = stackType, name = "New Stack", children = updateChildren ids }) model.stacks
                             , items = itemsUpdated
+
+                            --This is wrong - won't handle several parallel requests to similar/search
                             , isWaitingForSearch = False
                             , isLoadingMoreItems = False
+                            , isLoadingSimilar = False
                             , searchNextPageToken = body.nextPageToken
                         }
 
@@ -442,10 +454,20 @@ update msg model =
                 request =
                     Http.get
                         { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?q=" ++ model.searchTerm ++ "&pageToken=" ++ model.searchNextPageToken
-                        , expect = Http.expectJson (GotItems True) decodeItems
+                        , expect = Http.expectJson (GotItems True "SEARCH") decodeItems
                         }
             in
             ( { model | isLoadingMoreItems = True }, request )
+
+        SearchSimilar item ->
+            let
+                request =
+                    Http.get
+                        { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?relatedToVideoId=" ++ item.youtubeId ++ "&type=video"
+                        , expect = Http.expectJson (GotItems False "SIMILAR") decodeItems
+                        }
+            in
+            ( { model | isLoadingSimilar = True, sidebarState = Similar }, request )
 
         SaveModifiedItemsOnDemand ->
             saveModifiedItems model
@@ -690,6 +712,7 @@ viewTopBar model login =
         [ div []
             [ button [ classIf (model.sidebarState == Boards) "active", onClick (SetSidebar Boards) ] [ text "Boards" ]
             , button [ classIf (model.sidebarState == Search) "active", onClick (SetSidebar Search) ] [ text "Search" ]
+            , button [ classIf (model.sidebarState == Similar) "active", onClick (SetSidebar Similar) ] [ text "Similar" ]
             ]
         , div []
             [ button [ onClick SaveModifiedItemsOnDemand ] [ text "Save" ]
@@ -791,6 +814,10 @@ viewSidebar model =
             div [ class "sidebar" ]
                 (viewBoards model)
 
+        Similar ->
+            div [ class "sidebar" ]
+                (viewSimilar model)
+
         Hidden ->
             div [] []
 
@@ -801,18 +828,10 @@ hasCinemaVideo model =
 
 viewSearch model =
     let
-        stackM =
-            getSearchStack model
-
         items =
-            case stackM of
-                Just stack ->
-                    stack.children |> List.map (\itemId -> Dict.get itemId model.items) |> unpackMaybes
-
-                Nothing ->
-                    []
+            getItemsForStack "SEARCH" model
     in
-    [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick (SetSidebar Hidden), class "icon-button hide-icon" ] [ img [ src "/icons/chevron.svg" ] [] ] ]
+    [ viewSidebarHeader "Search"
     , input [ class "sidebar-search-input", onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
     , div [] (List.map (\item -> viewItem [] model.dragState model.videoBeingPlayed item) items)
     , elementIf model.isWaitingForSearch (progress [ class "material-progress-linear top" ] [])
@@ -820,6 +839,21 @@ viewSearch model =
         (div [ class "sidebar-bottom-action-container" ] [ button [ onClick LoadMoreSearch, class "dark" ] [ text "load more" ] ])
     , elementIf model.isLoadingMoreItems (progress [ class "material-progress-linear" ] [])
     ]
+
+
+viewSimilar model =
+    let
+        items =
+            getItemsForStack "SIMILAR" model
+    in
+    [ elementIf model.isLoadingSimilar (progress [ class "material-progress-linear top" ] [])
+    , viewSidebarHeader "Similar"
+    , div [] (List.map (\item -> viewItem [] model.dragState model.videoBeingPlayed item) items)
+    ]
+
+
+viewSidebarHeader title =
+    div [ class "sidebar-header" ] [ h3 [] [ text title ], button [ onClick (SetSidebar Hidden), class "icon-button hide-icon" ] [ img [ src "/icons/chevron.svg" ] [] ] ]
 
 
 elementIf condition element =
@@ -831,10 +865,8 @@ elementIf condition element =
 
 
 viewBoards model =
-    [ div [ class "sidebar-header" ]
-        [ h3 [] [ text ("Boards" ++ asteriskIf model.needToSyncProfile), viewSyncMessage model.userProfile ]
-        , button [ onClick (SetSidebar Hidden), class "icon-button hide-icon" ] [ img [ src "/icons/chevron.svg" ] [] ]
-        ]
+    [ viewSidebarHeader ("Boards" ++ asteriskIf model.needToSyncProfile)
+    , viewSyncMessage model.userProfile
     , div []
         (model.userProfile.boards
             |> List.map (flip Dict.get model.boards)
@@ -902,19 +934,22 @@ viewContent modificationState { name, id } =
 
 
 viewItem : List (Attribute Msg) -> DragState -> Maybe String -> Item -> Html Msg
-viewItem atts dragState videoBeingPlayed { id, name, youtubeId } =
+viewItem atts dragState videoBeingPlayed item =
     div
         (List.append
             [ class "item"
-            , classIf (isDraggingItem dragState id) "item-preview"
-            , classIf (Maybe.withDefault "" videoBeingPlayed == id) "active"
+            , classIf (isDraggingItem dragState item.id) "item-preview"
+            , classIf (Maybe.withDefault "" videoBeingPlayed == item.id) "active"
             ]
             atts
         )
-        [ img [ draggable "false", class "item-image", src ("https://i.ytimg.com/vi/" ++ youtubeId ++ "/mqdefault.jpg") ]
+        [ img [ draggable "false", class "item-image", src ("https://i.ytimg.com/vi/" ++ item.youtubeId ++ "/mqdefault.jpg") ]
             []
-        , span [ class "item-text" ] [ text name ]
-        , div [ class "item-click-overlay", onMouseDown (ItemMouseDown id), onMouseEnter (ItemEnterDuringDrag id) ] []
+        , span [ class "item-text" ] [ text item.name ]
+        , div [ class "item-click-overlay", onMouseEnter (ItemEnterDuringDrag item.id) ]
+            [ div [ class "click1", onMouseDown (ItemMouseDown item.id) ] []
+            , div [ class "item-icon-area", onClick (SearchSimilar item) ] [ img [ draggable "false", src "/icons/similar.svg" ] [] ]
+            ]
         ]
 
 
