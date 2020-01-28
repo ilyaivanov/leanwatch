@@ -7,6 +7,7 @@ firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
 function registerPlayer(ports) {
   var player;
+  var interval;
   ports.play.subscribe(function (videoId) {
     if (!player)
       player = init(videoId);
@@ -21,7 +22,7 @@ function registerPlayer(ports) {
         videoId: initialVideo,
         playerVars: {'autoplay': 1 /*, 'controls': 0 */},
         events: {
-          // 'onReady': onPlayerReady,
+          'onReady': onPlayerReady,
           'onStateChange': onPlayerStateChange,
         },
       });
@@ -30,6 +31,17 @@ function registerPlayer(ports) {
     function onPlayerStateChange(event) {
       if (event.data === YT.PlayerState.ENDED) {
         ports.onVideoEnded.send(null);
+      }
+    }
+
+    function onPlayerReady() {
+      console.log('registering interval');
+      interval = setInterval(tick, 800);
+    }
+
+    function tick() {
+      if (player.getPlayerState() === YT.PlayerState.PLAYING) {
+        console.log(player.getDuration(), player.getCurrentTime());
       }
     }
   });
