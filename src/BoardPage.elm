@@ -1,6 +1,6 @@
 port module BoardPage exposing (Model, Msg(..), createBoard, init, onBoardCreated, onBoardsLoaded, onUserProfileLoaded, onVideoEnded, update, view)
 
-import Board exposing (Board, Item, Stack)
+import Board exposing (..)
 import Browser.Dom as Dom exposing (focus)
 import Dict exposing (Dict)
 import DictMoves exposing (Parent, getParentByChildren)
@@ -88,23 +88,25 @@ mergeAndNormalizeResponse boardResponse model =
             List.map (\s -> s.id)
     in
     { model
-        | boards = Dict.insert boardResponse.id { id = boardResponse.id, name = boardResponse.name, children = getIds boardResponse.stacks } model.boards
-        , stacks = Dict.union stacks model.stacks
-        , items = Dict.union items model.items
+        | board =
+            { boards = Dict.insert boardResponse.id { id = boardResponse.id, name = boardResponse.name, children = getIds boardResponse.stacks } model.board.boards
+            , stacks = Dict.union stacks model.board.stacks
+            , items = Dict.union items model.board.items
+            }
     }
 
 
 denormalizeBoard : String -> Model -> Maybe BoardResponse
 denormalizeBoard boardId model =
-    Dict.get boardId model.boards
+    Dict.get boardId model.board.boards
         |> Maybe.map
             (\board ->
                 let
                     stacksNarrow =
-                        board.children |> List.map (\id -> Dict.get id model.stacks) |> unpackMaybes
+                        board.children |> List.map (\id -> Dict.get id model.board.stacks) |> unpackMaybes
 
                     stacks =
-                        stacksNarrow |> List.map (\s -> { id = s.id, name = s.name, items = s.children |> List.map (\id -> Dict.get id model.items) |> unpackMaybes })
+                        stacksNarrow |> List.map (\s -> { id = s.id, name = s.name, items = s.children |> List.map (\id -> Dict.get id model.board.items) |> unpackMaybes })
                 in
                 { id = board.id
                 , name = board.name
@@ -117,10 +119,13 @@ denormalizeBoard boardId model =
 -- MODEL
 
 
+getBoardViewModel : Model -> Maybe Board
+getBoardViewModel model =
+    Dict.get model.userProfile.selectedBoard model.board.boards
+
+
 type alias Model =
-    { boards : Dict String Board
-    , stacks : Dict String Stack
-    , items : Dict String Item
+    { board : BoardModel
     , videoBeingPlayed : Maybe String
     , userProfile : UserProfile
 
@@ -210,21 +215,9 @@ oneMinute =
     1000 * 60
 
 
-getItemsForStack : String -> Model -> List Item
-getItemsForStack stackName model =
-    model.stacks
-        |> Dict.get stackName
-        |> Maybe.map .children
-        |> Maybe.withDefault []
-        |> List.map (\itemId -> Dict.get itemId model.items)
-        |> unpackMaybes
-
-
 init : Model
 init =
-    { stacks = Dict.empty
-    , items = Dict.empty
-    , boards = Dict.empty
+    { board = Board.init
     , userProfile =
         { selectedBoard = ""
         , boards = []
@@ -261,38 +254,12 @@ type alias SearchResponse =
     }
 
 
-getStackToView : Model -> String -> ( Stack, List Item )
-getStackToView model stackId =
-    let
-        stack =
-            getStack stackId model.stacks
-
-        items =
-            stack.children |> List.map (\itemId -> Dict.get itemId model.items) |> unpackMaybes
-    in
-    ( stack, items )
-
-
-getItemById : Model -> String -> Maybe Item
-getItemById model itemId =
-    Dict.toList model.items
-        |> List.map Tuple.second
-        |> List.filter (\i -> i.id == itemId)
-        |> List.head
-
-
-getStack : String -> Dict String Stack -> Stack
-getStack stackId stacks =
-    Dict.get stackId stacks |> Maybe.withDefault { id = "NOT_FOUND", name = "NOT_FOUND", children = [] }
-
-
-getBoardViewModel : Model -> Maybe Board
-getBoardViewModel model =
-    Dict.get model.userProfile.selectedBoard model.boards
-
-
 
 -- UPDATE
+
+
+updateBoard model board =
+    { model | board = board }
 
 
 markSelectedBoardAsNeededToSync model =
@@ -325,7 +292,11 @@ update msg model =
                     handleMouseUp model.dragState
 
                 nextCommand =
-                    item |> Maybe.andThen (getItemById model) |> Maybe.map .youtubeId |> Maybe.map play |> Maybe.withDefault Cmd.none
+                    item
+                        |> Maybe.andThen (getItemById model.board)
+                        |> Maybe.map .youtubeId
+                        |> Maybe.map play
+                        |> Maybe.withDefault Cmd.none
 
                 nextVideo =
                     ifNothing item model.videoBeingPlayed
@@ -336,21 +307,22 @@ update msg model =
             noComand { model | dragState = handleMouseMove model.dragState newMousePosition }
 
         ItemEnterDuringDrag itemUnder ->
-            handleCardEnter model.dragState itemUnder model.stacks
-                |> Maybe.map (\newStacks -> { model | stacks = newStacks })
+            handleCardEnter model.dragState itemUnder model.board.stacks
+                |> Maybe.map (\newStacks -> { model | board = setStacks newStacks model.board })
                 |> Maybe.map markSelectedBoardAsNeededToSync
                 |> Maybe.withDefault model
                 |> noComand
 
         StackEnterDuringDrag stackUnder ->
-            handleStackEnter model.dragState stackUnder model.boards
-                |> Maybe.map (\newBoards -> { model | boards = newBoards })
+            handleStackEnter model.dragState stackUnder model.board.boards
+                |> Maybe.map (\newBoards -> { model | board = setBoards newBoards model.board })
                 |> Maybe.map markSelectedBoardAsNeededToSync
                 |> Maybe.withDefault model
                 |> noComand
 
         StackOverlayEnterDuringDrag stackUnder ->
-            handleStackOverlayEnter model.dragState stackUnder model
+            handleStackOverlayEnter model.dragState stackUnder model.board
+                |> Maybe.map (updateBoard model)
                 |> Maybe.map markSelectedBoardAsNeededToSync
                 |> Maybe.withDefault model
                 |> noComand
@@ -363,10 +335,7 @@ update msg model =
                 |> noComand
 
         CreateStack newStackId ->
-            { model
-                | boards = updateBoard model.userProfile.selectedBoard (\b -> { b | children = List.append b.children [ newStackId ] }) model.boards
-                , stacks = Dict.insert newStackId { id = newStackId, name = "New Stack", children = [] } model.stacks
-            }
+            { model | board = createStack model.userProfile.selectedBoard newStackId model.board }
                 |> markSelectedBoardAsNeededToSync
                 |> noComand
 
@@ -399,26 +368,16 @@ update msg model =
             case response of
                 Ok body ->
                     let
-                        ids =
-                            List.map .id body.items
-
-                        newItemsDict =
-                            Dict.fromList (List.map (\i -> ( i.id, i )) body.items)
-
-                        itemsUpdated =
-                            Dict.union newItemsDict model.items
-
-                        updateChildren nextItems =
+                        nextModel =
                             if needToAppend then
-                                List.append (Dict.get stackType model.stacks |> Maybe.map .children |> Maybe.withDefault []) nextItems
+                                appendStackChildren stackType body.items model.board
 
                             else
-                                ids
+                                setStackChildren stackType body.items model.board
                     in
                     noComand
                         { model
-                            | stacks = Dict.update stackType (\_ -> Just { id = stackType, name = "New Stack", children = updateChildren ids }) model.stacks
-                            , items = itemsUpdated
+                            | board = nextModel
 
                             --This is wrong - won't handle several parallel requests to similar/search
                             , isWaitingForSearch = False
@@ -533,40 +492,17 @@ update msg model =
                 newProfile =
                     { profile | boards = removeItem boardId profile.boards, selectedBoard = nextSelectedBoard }
             in
-            noComand ({ model | boards = Dict.remove boardId model.boards } |> updateProfileAndMarkAsNeededToSync newProfile)
+            noComand ({ model | board = removeBoard boardId model.board } |> updateProfileAndMarkAsNeededToSync newProfile)
 
         RemoveStack stackId ->
-            case getParentByChildren stackId model.boards of
-                Just board ->
-                    let
-                        newBoard =
-                            { board | children = removeItem stackId board.children }
-                    in
-                    { model | boards = Dict.insert board.id newBoard model.boards } |> markSelectedBoardAsNeededToSync |> noComand
-
-                Nothing ->
-                    noComand model
+            { model | board = removeStack model.userProfile.selectedBoard stackId model.board } |> noComand
 
         VideoEnded _ ->
-            let
-                stack =
-                    getParentByChildren (model.videoBeingPlayed |> Maybe.withDefault "") model.stacks
-            in
-            case ( stack, model.videoBeingPlayed ) of
-                ( Just actualStack, Just videoPlayed ) ->
-                    case getNextItem videoPlayed actualStack.children of
-                        Just nextItemId ->
-                            case getItemById model nextItemId of
-                                Just nextItem ->
-                                    ( { model | videoBeingPlayed = Just nextItem.id }, play nextItem.youtubeId )
+            case getNextItemInStack model.videoBeingPlayed model.board of
+                Just nextItem ->
+                    ( { model | videoBeingPlayed = Just nextItem.id }, play nextItem.youtubeId )
 
-                                Nothing ->
-                                    ( model, Cmd.none )
-
-                        Nothing ->
-                            ( model, Cmd.none )
-
-                _ ->
+                Nothing ->
                     ( model, Cmd.none )
 
         TogglePlayerMode ->
@@ -623,18 +559,12 @@ finishModification model =
         RenamingItem { itemId, newName } ->
             { model
                 | renamingState = NoRename
-                , boards = updateName model.boards itemId newName
-                , stacks = updateName model.stacks itemId newName
+                , board = updateName itemId newName model.board
             }
                 |> markSelectedBoardAsNeededToSync
 
         NoRename ->
             model
-
-
-updateName : Dict String { a | name : String } -> String -> String -> Dict String { a | name : String }
-updateName boards boardId newName =
-    Dict.update boardId (Maybe.map (\s -> { s | name = newName })) boards
 
 
 decodeItems : Json.Decoder SearchResponse
@@ -654,11 +584,6 @@ mapItem =
 
 createId =
     Random.float 0 1 |> Random.map String.fromFloat
-
-
-updateBoard : String -> (Board -> Board) -> Dict String Board -> Dict String Board
-updateBoard boardId updater boards =
-    Dict.update boardId (Maybe.map (\v -> updater v)) boards
 
 
 
@@ -741,9 +666,9 @@ viewBoard model =
                     [ class "columns-container" ]
                     (List.append
                         (board.children
-                            |> List.map (\stackId -> Dict.get stackId model.stacks)
+                            |> List.map (\stackId -> Dict.get stackId model.board.stacks)
                             |> unpackMaybes
-                            |> List.map (\stack -> viewStack model [ class "column-board" ] (getStackToView model stack.id))
+                            |> List.map (\stack -> viewStack model [ class "column-board" ] (getStackToView model.board stack.id))
                         )
                         [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "Add column" ], div [ class "post-add-stack-space" ] [] ]
                     )
@@ -811,7 +736,7 @@ hasCinemaVideo model =
 viewSearch model =
     let
         items =
-            getItemsForStack "SEARCH" model
+            getItemsForStack "SEARCH" model.board
     in
     [ viewSidebarHeader "Search"
     , input [ class "sidebar-search-input", onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
@@ -826,7 +751,7 @@ viewSearch model =
 viewSimilar model =
     let
         items =
-            getItemsForStack "SIMILAR" model
+            getItemsForStack "SIMILAR" model.board
     in
     [ elementIf model.isLoadingSimilar (progress [ class "material-progress-linear top" ] [])
     , viewSidebarHeader "Similar"
@@ -851,7 +776,7 @@ viewBoards model =
     , viewSyncMessage model.userProfile
     , div []
         (model.userProfile.boards
-            |> List.map (flip Dict.get model.boards)
+            |> List.map (flip Dict.get model.board.boards)
             |> unpackMaybes
             |> List.map (\item -> viewBoardButton model.dragState model [] item)
         )
@@ -946,15 +871,15 @@ viewElementBeingDragged model =
     in
     case getItemBeingDragged model.dragState of
         Just ( CardBeingDragged, elementPosition, itemId ) ->
-            Dict.get itemId model.items
+            Dict.get itemId model.board.items
                 |> Maybe.map (viewItem (getAttributes elementPosition) DragState.init model.videoBeingPlayed)
                 |> Maybe.withDefault (div [] [])
 
         Just ( StackBeingDragged, elementPosition, stackId ) ->
-            viewStack { renamingState = NoRename, dragState = DragState.init, videoBeingPlayed = model.videoBeingPlayed } (getAttributes elementPosition) (getStackToView model stackId)
+            viewStack { renamingState = NoRename, dragState = DragState.init, videoBeingPlayed = model.videoBeingPlayed } (getAttributes elementPosition) (getStackToView model.board stackId)
 
         Just ( BoardBeingDragged, elementPosition, boardId ) ->
-            model.boards
+            model.board.boards
                 |> Dict.get boardId
                 |> Maybe.map (viewBoardButton DragState.init model (getAttributes elementPosition))
                 |> Maybe.withDefault (div [] [])
