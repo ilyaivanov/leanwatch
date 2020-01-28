@@ -1,9 +1,11 @@
 module Main exposing (main)
 
-import BoardPage as Board
+import Board exposing (BoardResponse, decodeResponse)
+import BoardPage as BoardPage
 import Browser exposing (Document)
 import Browser.Navigation as Nav
 import Html exposing (Attribute, Html, div, text)
+import Json.Decode
 import Login as Login
 import Url exposing (Url)
 import Url.Parser as Parser exposing ((</>), Parser, s)
@@ -29,7 +31,7 @@ type alias Model =
     { page : Page
     , key : Nav.Key
     , login : Login.Model
-    , board : Board.Model
+    , board : BoardPage.Model
     }
 
 
@@ -38,7 +40,7 @@ init flags url key =
     ( { page = urlToPage url
       , key = key
       , login = Login.init
-      , board = Board.init
+      , board = BoardPage.init
       }
     , Cmd.none
     )
@@ -48,7 +50,7 @@ type Msg
     = ClickedLink Browser.UrlRequest
     | ChangedUrl Url
     | LoginMsg Login.Msg
-    | BoardMsg Board.Msg
+    | BoardMsg BoardPage.Msg
 
 
 
@@ -73,7 +75,7 @@ update msg model =
                 |> (\( login, cmd ) -> ( { model | login = login }, cmd ))
 
         BoardMsg boardMsg ->
-            Board.update boardMsg model.board
+            BoardPage.update boardMsg model.board
                 |> (\( board, cmd ) -> ( { model | board = board }, cmd |> Cmd.map BoardMsg ))
 
         ChangedUrl url ->
@@ -88,16 +90,30 @@ update msg model =
                     ( model, Nav.pushUrl model.key (Url.toString url) )
 
 
+mapLoadedBoards : Json.Decode.Value -> Msg
+mapLoadedBoards modelJson =
+    case Json.Decode.decodeValue decodeResponse modelJson of
+        Ok model ->
+            BoardMsg (BoardPage.BoardsLoaded model)
+
+        Err errorMessage ->
+            let
+                _ =
+                    Debug.log "Error in mapWorkerUpdated:" errorMessage
+            in
+            BoardMsg BoardPage.Noop
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ Login.onLogin Login.OnLogin |> Sub.map LoginMsg
         , Login.onLogout Login.OnLogout |> Sub.map LoginMsg
         , Login.onLoginCancel Login.OnLoginError |> Sub.map LoginMsg
-        , Board.onUserProfileLoaded Board.UserProfileLoaded |> Sub.map BoardMsg
-        , Board.onBoardsLoaded Board.BoardsLoaded |> Sub.map BoardMsg
-        , Board.onBoardCreated Board.OnBoardCreated |> Sub.map BoardMsg
-        , Board.onVideoEnded Board.VideoEnded |> Sub.map BoardMsg
+        , BoardPage.onUserProfileLoaded BoardPage.UserProfileLoaded |> Sub.map BoardMsg
+        , BoardPage.onBoardCreated BoardPage.OnBoardCreated |> Sub.map BoardMsg
+        , BoardPage.onVideoEnded BoardPage.VideoEnded |> Sub.map BoardMsg
+        , BoardPage.onBoardsLoaded mapLoadedBoards
         ]
 
 
@@ -106,8 +122,6 @@ parser =
     Parser.oneOf
         [ Parser.map Login (s "login")
         , Parser.map Boards Parser.top
-
-        --, Parser.map SelectedPhoto (s "photos" </> Parser.string)
         ]
 
 
@@ -146,7 +160,7 @@ viewPage model =
                         _ ->
                             Nothing
             in
-            Board.view model.board loginStatus |> Html.map BoardMsg
+            BoardPage.view model.board loginStatus |> Html.map BoardMsg
 
         NotFound ->
             text "NotFound"

@@ -27,7 +27,7 @@ noComand model =
 port onUserProfileLoaded : (UserProfile -> msg) -> Sub msg
 
 
-port onBoardsLoaded : (List BoardResponse -> msg) -> Sub msg
+port onBoardsLoaded : (Json.Value -> msg) -> Sub msg
 
 
 port saveBoard : List BoardResponse -> Cmd msg
@@ -518,16 +518,8 @@ finishModification model =
 decodeItems : Json.Decoder SearchResponse
 decodeItems =
     Json.map2 SearchResponse
-        (Json.field "items" (Json.list mapItem))
+        (Json.field "items" (Json.list decodeItem))
         (Json.field "nextPageToken" Json.string)
-
-
-mapItem : Json.Decoder Item
-mapItem =
-    Json.map3 Item
-        (Json.field "id" Json.string)
-        (Json.field "name" Json.string)
-        (Json.field "youtubeId" Json.string)
 
 
 createId =

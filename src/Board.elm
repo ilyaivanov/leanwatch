@@ -2,6 +2,7 @@ module Board exposing (..)
 
 import Dict exposing (Dict)
 import DictMoves exposing (Parent, getParentByChildren)
+import Json.Decode as Json
 import Utils.Other exposing (getNextItem, removeItem, unpackMaybes)
 
 
@@ -28,6 +29,8 @@ type alias Item =
     { id : String
     , name : String
     , youtubeId : String
+    , duration : Maybe Float
+    , currentTime : Maybe Float
     }
 
 
@@ -207,18 +210,55 @@ onStackLoadingDone stackId nextPageToken model =
 type alias BoardResponse =
     { id : String
     , name : String
-    , stacks :
-        List
-            { id : String
-            , name : String
-            , items :
-                List
-                    { id : String
-                    , name : String
-                    , youtubeId : String
-                    }
-            }
+    , stacks : List StackResponse
     }
+
+
+type alias StackResponse =
+    { id : String
+    , name : String
+    , items : List ItemResponse
+    }
+
+
+type alias ItemResponse =
+    { id : String
+    , name : String
+    , youtubeId : String
+    , duration : Maybe Float
+    , currentTime : Maybe Float
+    }
+
+
+decodeResponse : Json.Decoder (List BoardResponse)
+decodeResponse =
+    Json.list decodeBoard
+
+
+decodeBoard : Json.Decoder BoardResponse
+decodeBoard =
+    Json.map3 BoardResponse
+        (Json.field "id" Json.string)
+        (Json.field "name" Json.string)
+        (Json.field "stacks" (Json.list decodeStack))
+
+
+decodeStack : Json.Decoder StackResponse
+decodeStack =
+    Json.map3 StackResponse
+        (Json.field "id" Json.string)
+        (Json.field "name" Json.string)
+        (Json.field "items" (Json.list decodeItem))
+
+
+decodeItem : Json.Decoder ItemResponse
+decodeItem =
+    Json.map5 ItemResponse
+        (Json.field "id" Json.string)
+        (Json.field "name" Json.string)
+        (Json.field "youtubeId" Json.string)
+        (Json.maybe (Json.field "duration" Json.float))
+        (Json.maybe (Json.field "currentTime" Json.float))
 
 
 mergeAndNormalizeResponse : BoardResponse -> BoardModel -> BoardModel
@@ -231,7 +271,7 @@ mergeAndNormalizeResponse boardResponse model =
             boardResponse.stacks |> List.map (\s -> s.items) |> List.concat
 
         items =
-            Dict.fromList (List.map (\i -> ( i.id, { id = i.id, name = i.name, youtubeId = i.youtubeId } )) allItems)
+            Dict.fromList (List.map (\i -> ( i.id, i )) allItems)
     in
     { boards = Dict.insert boardResponse.id { id = boardResponse.id, name = boardResponse.name, children = getIds boardResponse.stacks } model.boards
     , stacks = Dict.union stacks model.stacks
