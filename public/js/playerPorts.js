@@ -44,10 +44,6 @@ function registerPlayer(ports) {
         ports.onVideoProgress.send({
           currentTime: player.getCurrentTime(),
           duration: player.getDuration(),
-        })
-        console.log({
-          currentTime: player.getCurrentTime(),
-          duration: player.getDuration(),
         });
       }
     }

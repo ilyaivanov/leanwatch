@@ -16,7 +16,7 @@ import Random
 import Set exposing (Set)
 import Task
 import Utils.ExtraEvents exposing (..)
-import Utils.Other exposing (flip, ifNothing, maybeHasValue, removeItem, unpackMaybes)
+import Utils.Other exposing (..)
 
 
 noComand : Model -> ( Model, Cmd msg )
@@ -361,7 +361,7 @@ update msg model =
 
         UpdateTimeline timeline ->
             model.videoBeingPlayed
-                |> Maybe.map (\videoPlayed -> { model | board = updateTimeline videoPlayed timeline model.board })
+                |> Maybe.map (\videoPlayed -> { model | board = updateTimeline videoPlayed timeline model.board } |> markSelectedBoardAsNeededToSync)
                 |> Maybe.withDefault model
                 |> noComand
 
@@ -809,14 +809,40 @@ viewItem atts dragState videoBeingPlayed item =
             ]
             atts
         )
-        [ img [ draggable "false", class "item-image", src ("https://i.ytimg.com/vi/" ++ item.youtubeId ++ "/mqdefault.jpg") ]
-            []
+        [ div [ class "item-image-container" ]
+            [ img [ draggable "false", class "item-image", src ("https://i.ytimg.com/vi/" ++ item.youtubeId ++ "/mqdefault.jpg") ] []
+            , viewItemDuration item
+            ]
         , span [ class "item-text" ] [ text item.name ]
+        , viewItemProgress item
         , div [ class "item-click-overlay", onMouseEnter (ItemEnterDuringDrag item.id) ]
-            [ div [ class "click1", onMouseDown (ItemMouseDown item.id) ] []
+            [ div [ class "item-drag-mouse-down-area", onMouseDown (ItemMouseDown item.id) ] []
             , div [ class "item-icon-area", onClick (SearchSimilar item) ] [ img [ draggable "false", src "/icons/similar.svg" ] [] ]
             ]
         ]
+
+
+viewItemDuration item =
+    case item.duration of
+        Just duration ->
+            div [ class "item-duration" ] [ text (formatTime duration) ]
+
+        Nothing ->
+            div [] []
+
+
+viewItemProgress : Item -> Html msg
+viewItemProgress item =
+    case ( item.duration, item.currentTime ) of
+        ( Just duration, Just currentTime ) ->
+            let
+                percent =
+                    String.fromInt (round ((currentTime / duration) * 100)) ++ "%"
+            in
+            div [ class "item-progress-filled", style "width" percent ] []
+
+        _ ->
+            div [] []
 
 
 viewElementBeingDragged : Model -> Html Msg

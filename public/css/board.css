@@ -113,6 +113,7 @@
     cursor: var(--drag-cursor);
     position: relative;
     border-radius: 4px;
+    overflow: hidden;
     box-shadow: 1px 2px 5px 0 rgba(0, 0, 0, 0.53);
 }
 
@@ -130,12 +131,25 @@
     color: white;
 }
 
-.item-image {
-    border-top-left-radius: 4px;
-    border-bottom-left-radius: 4px;
+.item-image-container{
     height: 100%;
-    width: 66px;
+    width: var(--card-image-width);
+    position: relative;
+}
+.item-image {
+    height: 100%;
+    width: 100%;
     object-fit: cover;
+}
+.item-duration{
+    background-color: #1e1e1e;
+    color: rgba(255,255,255,0.8);
+    font-size: 10px;
+    position: absolute;
+    right: 0;
+    bottom: var(--card-progress-height);
+    padding-left: 2px;
+    padding-right: 2px;
 }
 
 /* We need this to handle properly offseX and offsetY because of the image in the item */
@@ -150,7 +164,7 @@
     align-items: stretch;
 }
 
-.click1 {
+.item-drag-mouse-down-area {
     flex: 1;
 }
 
@@ -163,8 +177,6 @@
     display: none;
     justify-content: center;
     align-items: center;
-    border-bottom-right-radius: 4px;
-    border-top-right-radius: 4px;
 }
 
 .item-icon-area:hover {
@@ -202,4 +214,12 @@
     border: none;
     color: rgba(0, 0, 0, 0);
     background-color: rgba(0, 0, 0, 0.1);
+}
+
+.item-progress-filled {
+    position: absolute;
+    bottom:0;
+    left:0;
+    height: var(--card-progress-height);
+    background-color: #cf6d68;
 }

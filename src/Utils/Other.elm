@@ -40,3 +40,31 @@ maybeHasValue maybe =
 
         Nothing ->
             False
+
+
+formatTime time =
+    let
+        seconds =
+            modBy 60 (round time)
+
+        minutes =
+            modBy 60 (round time // 60)
+
+        hours =
+            round time // (60 * 60)
+
+        hoursPrefix =
+            if hours > 0 then
+                String.fromInt hours ++ ":"
+
+            else
+                ""
+
+        minutesFormatted =
+            if minutes < 10 then
+                "0" ++ String.fromInt minutes
+
+            else
+                String.fromInt minutes
+    in
+    hoursPrefix ++ minutesFormatted ++ ":" ++ String.fromInt seconds

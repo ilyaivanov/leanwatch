@@ -4,6 +4,7 @@ import Dict exposing (Dict)
 import DictMoves exposing (moveItem, moveItemToEnd)
 import Expect exposing (Expectation)
 import Test exposing (..)
+import Utils.Other exposing (formatTime)
 
 
 suite : Test
@@ -48,5 +49,13 @@ suite =
                         moveItemToEnd initial { itemToMove = "Item_1", targetParent = "Stack 2" }
                 in
                 received |> Expect.equal expected
+            )
+        , test "Formatting 1:32:45"
+            (\_ ->
+                formatTime (1 * 60 * 60 + 32 * 60 + 45 + 0.25) |> Expect.equal "1:32:45"
+            )
+        , test "Formatting 1:02:45"
+            (\_ ->
+                formatTime (1 * 60 * 60 + 2 * 60 + 45 + 0.25) |> Expect.equal "1:02:45"
             )
         ]
