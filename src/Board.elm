@@ -131,6 +131,8 @@ type alias Model =
     , needToSyncProfile : Bool
     , searchTerm : String
     , isWaitingForSearch : Bool
+    , isLoadingMoreItems : Bool
+    , searchNextPageToken : String
     , playerMode : PlayerMode
 
     -- Used to debounce search on input
@@ -175,7 +177,8 @@ type Msg
       -- Debounced search
     | AttemptToSearch String
     | DebouncedSearch String String
-    | GotItems (Result Http.Error SearchResponse)
+    | GotItems Bool (Result Http.Error SearchResponse)
+    | LoadMoreSearch
       -- Sidebar
     | SetSidebar SidebarState
       -- Board Management
@@ -217,6 +220,8 @@ init =
     , boardIdsToSync = Set.empty
     , needToSyncProfile = False
     , isWaitingForSearch = False
+    , isLoadingMoreItems = False
+    , searchNextPageToken = ""
     , dragState = DragState.init
     , renamingState = NoRename
     , searchTerm = ""
@@ -256,6 +261,7 @@ type alias Item =
 
 type alias SearchResponse =
     { items : List Item
+    , nextPageToken : String
     }
 
 
@@ -389,7 +395,7 @@ update msg model =
                 request =
                     Http.get
                         { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?q=" ++ term
-                        , expect = Http.expectJson GotItems decodeItems
+                        , expect = Http.expectJson (GotItems False) decodeItems
                         }
             in
             if id == model.currentSearchId then
@@ -398,7 +404,7 @@ update msg model =
             else
                 ( model, Cmd.none )
 
-        GotItems response ->
+        GotItems needToAppend response ->
             case response of
                 Ok body ->
                     let
@@ -410,12 +416,36 @@ update msg model =
 
                         itemsUpdated =
                             Dict.union newItemsDict model.items
+
+                        updateChildren nextItems =
+                            if needToAppend then
+                                List.append (Dict.get "SEARCH" model.stacks |> Maybe.map .children |> Maybe.withDefault []) nextItems
+
+                            else
+                                ids
                     in
-                    noComand { model | stacks = Dict.update "SEARCH" (\_ -> Just { id = "SEARCH", name = "New Stack", children = ids }) model.stacks, items = itemsUpdated, isWaitingForSearch = False }
+                    noComand
+                        { model
+                            | stacks = Dict.update "SEARCH" (\_ -> Just { id = "SEARCH", name = "New Stack", children = updateChildren ids }) model.stacks
+                            , items = itemsUpdated
+                            , isWaitingForSearch = False
+                            , isLoadingMoreItems = False
+                            , searchNextPageToken = body.nextPageToken
+                        }
 
                 _ ->
                     -- Handle errors
                     noComand { model | isWaitingForSearch = False }
+
+        LoadMoreSearch ->
+            let
+                request =
+                    Http.get
+                        { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?q=" ++ model.searchTerm ++ "&pageToken=" ++ model.searchNextPageToken
+                        , expect = Http.expectJson (GotItems True) decodeItems
+                        }
+            in
+            ( { model | isLoadingMoreItems = True }, request )
 
         SaveModifiedItemsOnDemand ->
             saveModifiedItems model
@@ -605,8 +635,9 @@ updateName boards boardId newName =
 
 decodeItems : Json.Decoder SearchResponse
 decodeItems =
-    Json.map SearchResponse
+    Json.map2 SearchResponse
         (Json.field "items" (Json.list mapItem))
+        (Json.field "nextPageToken" Json.string)
 
 
 mapItem : Json.Decoder Item
@@ -784,12 +815,19 @@ viewSearch model =
     [ div [ class "sidebar-header" ] [ h3 [] [ text "Search" ], button [ onClick (SetSidebar Hidden), class "icon-button hide-icon" ] [ img [ src "/icons/chevron.svg" ] [] ] ]
     , input [ class "sidebar-search-input", onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
     , div [] (List.map (\item -> viewItem [] model.dragState model.videoBeingPlayed item) items)
-    , if model.isWaitingForSearch then
-        progress [ class "material-progress-linear" ] []
-
-      else
-        div [] []
+    , elementIf model.isWaitingForSearch (progress [ class "material-progress-linear top" ] [])
+    , elementIf (not (List.isEmpty items) && not model.isLoadingMoreItems)
+        (div [ class "sidebar-bottom-action-container" ] [ button [ onClick LoadMoreSearch, class "dark" ] [ text "load more" ] ])
+    , elementIf model.isLoadingMoreItems (progress [ class "material-progress-linear" ] [])
     ]
+
+
+elementIf condition element =
+    if condition then
+        element
+
+    else
+        div [] []
 
 
 viewBoards model =
@@ -803,7 +841,7 @@ viewBoards model =
             |> unpackMaybes
             |> List.map (\item -> viewBoardButton model.dragState model [] item)
         )
-    , div [ class "add-board-container" ] [ button [ onClick CreateNewBoard, class "dark" ] [ text "Add board" ] ]
+    , div [ class "sidebar-bottom-action-container" ] [ button [ onClick CreateNewBoard, class "dark" ] [ text "Add board" ] ]
     , div [ class "small-text" ] [ text "* - means board requires syncing" ]
     ]
 

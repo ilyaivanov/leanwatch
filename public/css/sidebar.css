@@ -1,9 +1,26 @@
-.material-progress-linear {
-    position: absolute;
+.material-progress-linear.bottom {
+    width: 100%;
+}
+
+.material-progress-linear.top {
     top: 0;
     left: 0;
     right: 0;
+    position: absolute;
     width: 100%;
+}
+
+
+.sidebar-bottom-action-container {
+    display: flex;
+    justify-content: center;
+    align-content: center;
+    margin-bottom: 10px;
+    margin-top: 10px;
+}
+
+.relative{
+    position: relative;
 }
 
 /*Move other sidebar styles here*/
