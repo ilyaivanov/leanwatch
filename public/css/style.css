@@ -2,6 +2,7 @@
     font-family: Helvetica, Arial, sans-serif;
     user-select: none;
     --item-width: 280px;
+    --item-height: 48px;
     --item-padding: 14px;
     --double-item-padding: 28px;
 
