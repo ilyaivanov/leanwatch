@@ -1,6 +1,6 @@
 module Main exposing (main)
 
-import Board exposing (BoardResponse, decodeResponse)
+import Board exposing (BoardResponse, TimeLineInfo, decodeResponse)
 import BoardPage as BoardPage
 import Browser exposing (Document)
 import Browser.Navigation as Nav
@@ -104,6 +104,26 @@ mapLoadedBoards modelJson =
             BoardMsg BoardPage.Noop
 
 
+mapVideoProgress : Json.Decode.Value -> Msg
+mapVideoProgress json =
+    let
+        decoder =
+            Json.Decode.map2 TimeLineInfo
+                (Json.Decode.field "duration" Json.Decode.float)
+                (Json.Decode.field "currentTime" Json.Decode.float)
+    in
+    case Json.Decode.decodeValue decoder json of
+        Ok model ->
+            BoardMsg (BoardPage.UpdateTimeline model)
+
+        Err errorMessage ->
+            let
+                _ =
+                    Debug.log "Error in mapWorkerUpdated:" errorMessage
+            in
+            BoardMsg BoardPage.Noop
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
@@ -114,6 +134,7 @@ subscriptions model =
         , BoardPage.onBoardCreated BoardPage.OnBoardCreated |> Sub.map BoardMsg
         , BoardPage.onVideoEnded BoardPage.VideoEnded |> Sub.map BoardMsg
         , BoardPage.onBoardsLoaded mapLoadedBoards
+        , BoardPage.onVideoProgress mapVideoProgress
         ]
 
 

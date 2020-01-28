@@ -41,7 +41,14 @@ function registerPlayer(ports) {
 
     function tick() {
       if (player.getPlayerState() === YT.PlayerState.PLAYING) {
-        console.log(player.getDuration(), player.getCurrentTime());
+        ports.onVideoProgress.send({
+          currentTime: player.getCurrentTime(),
+          duration: player.getDuration(),
+        })
+        console.log({
+          currentTime: player.getCurrentTime(),
+          duration: player.getDuration(),
+        });
       }
     }
   });
