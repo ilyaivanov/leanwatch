@@ -1,4 +1,4 @@
-.material-progress-linear.bottom {
+.material-progress-linear {
     width: 100%;
 }
 
@@ -7,7 +7,6 @@
     left: 0;
     right: 0;
     position: absolute;
-    width: 100%;
 }
 
 
