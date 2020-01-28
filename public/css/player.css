@@ -13,10 +13,3 @@
     width: 400px;
     height: 150px;
 }
-
-
-.player-container {
-    position: fixed;
-    right: 15px;
-    bottom: 15px;
-}

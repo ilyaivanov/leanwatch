@@ -1,0 +1,179 @@
+.board {
+    float: left;
+    display: flex;
+    flex-direction: column;
+    width: var(--board-width);
+    overflow-y: auto;
+    max-height: var(--board-height);
+}
+
+.board-with-sidebar {
+    --board-width: var(--board-width-with-sidebar);
+}
+
+.empty-stack-placeholder {
+    margin-top: var(--item-padding);
+    height: 20px;
+    width: var(--item-width);
+    /* background-color: rgb(234, 253, 205); */
+}
+
+.columns-container {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    min-height: var(--column-container-height);
+    height: var(--column-container-height);
+    width: var(--board-width);
+    overflow-x: auto;
+}
+
+.board-title {
+    height: var(--board-header-height);
+    padding: var(--item-padding);
+    font-weight: bold;
+    color: white;
+}
+
+.board-during-drag {
+    --drag-cursor: grabbing;
+    cursor: var(--drag-cursor);
+}
+
+.board-during-drag button {
+    cursor: inherit;
+}
+
+.column {
+    max-height: var(--column-height);
+    max-width: var(--sidebar-width);
+    background-color: var(--stack-color);
+    border-radius: 4px;
+    overflow: auto;
+    box-shadow: 1px 2px 5px 0px rgba(0, 0, 0, 0.53);
+}
+
+.column-board {
+    margin-left: var(--item-padding);
+}
+
+.column-title {
+    padding: var(--item-padding);
+    height: 3em;
+    user-select: none;
+    cursor: var(--drag-cursor);
+    position: relative;
+    color: rgba(0, 0, 0, 0.8);
+    font-weight: bold;
+}
+
+.column-title-actions {
+    display: none;
+    flex-direction: row;
+    position: absolute;
+    right: 0;
+    top: 8px;
+}
+
+.column-title:hover .column-title-actions {
+    display: flex;
+}
+
+/*Do not show tooltips when dragging some item over a tooltip area*/
+.board-during-drag .board .column-title-actions {
+    display: none;
+}
+
+.column-content {
+    padding: 0 var(--item-padding) var(--item-padding) var(--item-padding);
+}
+
+.column-preview {
+    opacity: 0.4;
+}
+
+.column-drag-overlay {
+    display: flex;
+    flex-direction: column;
+}
+
+.column-footer {
+    flex: 1;
+    /* background-color: rgb(234, 253, 205); */
+}
+
+/* CARDS */
+
+.item {
+    height: 48px;
+    width: var(--item-width);
+    background-color: white;
+    display: flex;
+    margin-top: var(--item-padding);
+    cursor: var(--drag-cursor);
+    position: relative;
+    border-radius: 4px;
+    box-shadow: 1px 2px 5px 0 rgba(0, 0, 0, 0.53);
+}
+.item:hover{
+    background-color: #ebebeb;
+}
+.item.item-dragged {
+    background-color: #ebebeb;
+    z-index: 102;
+}
+
+.item.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.item:first-of-type {
+    margin-top: 0;
+}
+
+.item-image {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+    height: 100%;
+    width: 66px;
+    object-fit: cover;
+}
+
+/* We need this to handle properly offseX and offsetY because of the image in the item */
+.item-click-overlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+.item-preview .item-image {
+    display: none;
+}
+
+.item-text {
+    flex: 1;
+    overflow: hidden;
+    padding-left: 6px;
+    padding-right: 6px;
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+}
+
+.item-dragged {
+    position: absolute;
+    margin: 0;
+    pointer-events: none;
+    transform: rotate(4deg);
+    transition: transform 100ms;
+}
+
+.item.item-preview {
+    box-shadow: none;
+    border: none;
+    color: rgba(0, 0, 0, 0);
+    background-color: rgba(0, 0, 0, 0.1);
+}
