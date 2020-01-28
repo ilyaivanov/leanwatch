@@ -1,6 +1,6 @@
 module Main exposing (main)
 
-import Board as Board
+import BoardPage as Board
 import Browser exposing (Document)
 import Browser.Navigation as Nav
 import Html exposing (Attribute, Html, div, text)
