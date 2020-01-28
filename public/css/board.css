@@ -85,7 +85,7 @@
 }
 
 .column-content {
-    padding: 0 var(--item-padding) var(--item-padding) var(--item-padding);
+    padding: 0 var(--item-padding) 0 var(--item-padding);
 }
 
 .column-preview {
@@ -109,7 +109,7 @@
     width: var(--item-width);
     background-color: white;
     display: flex;
-    margin-top: var(--item-padding);
+    margin-bottom: var(--item-padding);
     cursor: var(--drag-cursor);
     position: relative;
     border-radius: 4px;
@@ -126,10 +126,6 @@
 .item.active {
     background-color: var(--primary-color);
     color: white;
-}
-
-.item:first-of-type {
-    margin-top: 0;
 }
 
 .item-image {

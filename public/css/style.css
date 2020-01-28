@@ -60,6 +60,7 @@ body {
     height: var(--sidebar-height);
     padding: var(--item-padding);
     padding-top: 0;
+    padding-bottom: 0;
 
     box-shadow: 1px 2px 5px 0px rgba(0, 0, 0, 0.53);
     /*without this shadow is drawn under the stacks and cards*/
@@ -129,12 +130,6 @@ button.dark:active {
     background-color: rgba(0, 0, 0, .55);
 }
 
-.add-board-container {
-    display: flex;
-    justify-content: center;
-    align-content: center;
-    margin-bottom: 10px;
-}
 
 .icon-button {
     display: flex;
