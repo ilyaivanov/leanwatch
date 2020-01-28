@@ -97,10 +97,6 @@ mapLoadedBoards modelJson =
             BoardMsg (BoardPage.BoardsLoaded model)
 
         Err errorMessage ->
-            let
-                _ =
-                    Debug.log "Error in mapWorkerUpdated:" errorMessage
-            in
             BoardMsg BoardPage.Noop
 
 
@@ -117,10 +113,6 @@ mapVideoProgress json =
             BoardMsg (BoardPage.UpdateTimeline model)
 
         Err errorMessage ->
-            let
-                _ =
-                    Debug.log "Error in mapWorkerUpdated:" errorMessage
-            in
             BoardMsg BoardPage.Noop
 
 

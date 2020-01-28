@@ -44,11 +44,14 @@ maybeHasValue maybe =
 
 formatTime time =
     let
+        timeInt =
+            floor time
+
         seconds =
-            modBy 60 (round time)
+            modBy 60 timeInt
 
         minutes =
-            modBy 60 (round time // 60)
+            modBy 60 (timeInt // 60)
 
         hours =
             round time // (60 * 60)
