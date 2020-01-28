@@ -52,70 +52,6 @@ port onBoardCreated : (BoardResponse -> msg) -> Sub msg
 
 
 
--- NORMALIZATION to extract
-
-
-type alias BoardResponse =
-    { id : String
-    , name : String
-    , stacks :
-        List
-            { id : String
-            , name : String
-            , items :
-                List
-                    { id : String
-                    , name : String
-                    , youtubeId : String
-                    }
-            }
-    }
-
-
-mergeAndNormalizeResponse : BoardResponse -> Model -> Model
-mergeAndNormalizeResponse boardResponse model =
-    let
-        stacks =
-            Dict.fromList (List.map (\s -> ( s.id, { id = s.id, name = s.name, children = getIds s.items } )) boardResponse.stacks)
-
-        allItems =
-            boardResponse.stacks |> List.map (\s -> s.items) |> List.concat
-
-        items =
-            Dict.fromList (List.map (\i -> ( i.id, { id = i.id, name = i.name, youtubeId = i.youtubeId } )) allItems)
-
-        getIds =
-            List.map (\s -> s.id)
-    in
-    { model
-        | board =
-            { boards = Dict.insert boardResponse.id { id = boardResponse.id, name = boardResponse.name, children = getIds boardResponse.stacks } model.board.boards
-            , stacks = Dict.union stacks model.board.stacks
-            , items = Dict.union items model.board.items
-            }
-    }
-
-
-denormalizeBoard : String -> Model -> Maybe BoardResponse
-denormalizeBoard boardId model =
-    Dict.get boardId model.board.boards
-        |> Maybe.map
-            (\board ->
-                let
-                    stacksNarrow =
-                        board.children |> List.map (\id -> Dict.get id model.board.stacks) |> unpackMaybes
-
-                    stacks =
-                        stacksNarrow |> List.map (\s -> { id = s.id, name = s.name, items = s.children |> List.map (\id -> Dict.get id model.board.items) |> unpackMaybes })
-                in
-                { id = board.id
-                , name = board.name
-                , stacks = stacks
-                }
-            )
-
-
-
 -- MODEL
 
 
@@ -136,11 +72,8 @@ type alias Model =
     , boardIdsToSync : Set String
     , needToSyncProfile : Bool
     , searchTerm : String
-    , isWaitingForSearch : Bool
-    , isLoadingMoreItems : Bool
-    , isLoadingSimilar : Bool
-    , searchNextPageToken : String
     , playerMode : PlayerMode
+    , similarItem : Maybe Item
 
     -- Used to debounce search on input
     , currentSearchId : String
@@ -185,8 +118,10 @@ type Msg
       -- Debounced search
     | AttemptToSearch String
     | DebouncedSearch String String
-    | GotItems Bool String (Result Http.Error SearchResponse)
-    | LoadMoreSearch
+    | FinishLoadingItems String (Result Http.Error SearchResponse)
+    | FinishLoadingPage String (Result Http.Error SearchResponse)
+    | LoadMoreSearch String
+    | LoadMoreSimilar String
     | SearchSimilar Item
       -- Sidebar
     | SetSidebar SidebarState
@@ -226,15 +161,12 @@ init =
         }
     , boardIdsToSync = Set.empty
     , needToSyncProfile = False
-    , isWaitingForSearch = False
-    , isLoadingMoreItems = False
-    , isLoadingSimilar = False
-    , searchNextPageToken = ""
     , dragState = DragState.init
     , renamingState = NoRename
     , searchTerm = ""
     , currentSearchId = ""
     , videoBeingPlayed = Nothing
+    , similarItem = Nothing
     , sidebarState = Boards
     , playerMode = MiniPlayer
     }
@@ -355,60 +287,73 @@ update msg model =
                 request =
                     Http.get
                         { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?q=" ++ term
-                        , expect = Http.expectJson (GotItems False "SEARCH") decodeItems
+                        , expect = Http.expectJson (FinishLoadingItems "SEARCH") decodeItems
                         }
             in
             if id == model.currentSearchId then
-                ( { model | currentSearchId = "", isWaitingForSearch = True }, request )
+                ( { model | currentSearchId = "", board = startLoading "SEARCH" model.board }, request )
 
             else
                 ( model, Cmd.none )
 
-        GotItems needToAppend stackType response ->
+        FinishLoadingItems stackId response ->
             case response of
                 Ok body ->
                     let
-                        nextModel =
-                            if needToAppend then
-                                appendStackChildren stackType body.items model.board
-
-                            else
-                                setStackChildren stackType body.items model.board
+                        nextBoard =
+                            model.board |> setStackChildren stackId body.items |> onStackLoadingDone stackId body.nextPageToken
                     in
-                    noComand
-                        { model
-                            | board = nextModel
+                    { model | board = nextBoard } |> noComand
 
-                            --This is wrong - won't handle several parallel requests to similar/search
-                            , isWaitingForSearch = False
-                            , isLoadingMoreItems = False
-                            , isLoadingSimilar = False
-                            , searchNextPageToken = body.nextPageToken
-                        }
+                Err error ->
+                    model |> noComand
 
-                _ ->
-                    -- Handle errors
-                    noComand { model | isWaitingForSearch = False }
+        FinishLoadingPage stackId response ->
+            case response of
+                Ok body ->
+                    let
+                        nextBoard =
+                            model.board |> appendStackChildren stackId body.items |> onStackLoadingDone stackId body.nextPageToken
+                    in
+                    { model | board = nextBoard } |> noComand
 
-        LoadMoreSearch ->
+                Err error ->
+                    model |> noComand
+
+        LoadMoreSearch nextPage ->
             let
                 request =
                     Http.get
-                        { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?q=" ++ model.searchTerm ++ "&pageToken=" ++ model.searchNextPageToken
-                        , expect = Http.expectJson (GotItems True "SEARCH") decodeItems
+                        { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?q=" ++ model.searchTerm ++ "&pageToken=" ++ nextPage
+                        , expect = Http.expectJson (FinishLoadingPage "SEARCH") decodeItems
                         }
             in
-            ( { model | isLoadingMoreItems = True }, request )
+            ( { model | board = startLoadingNextPage "SEARCH" model.board }, request )
 
         SearchSimilar item ->
             let
                 request =
                     Http.get
                         { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?relatedToVideoId=" ++ item.youtubeId ++ "&type=video"
-                        , expect = Http.expectJson (GotItems False "SIMILAR") decodeItems
+                        , expect = Http.expectJson (FinishLoadingItems "SIMILAR") decodeItems
                         }
             in
-            ( { model | isLoadingSimilar = True, sidebarState = Similar }, request )
+            ( { model | sidebarState = Similar, board = startLoading "SIMILAR" model.board, similarItem = Just item }, request )
+
+        LoadMoreSimilar nextPage ->
+            case model.similarItem of
+                Just item ->
+                    let
+                        request =
+                            Http.get
+                                { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?relatedToVideoId=" ++ item.youtubeId ++ "&type=video&pageToken=" ++ nextPage
+                                , expect = Http.expectJson (FinishLoadingPage "SIMILAR") decodeItems
+                                }
+                    in
+                    ( { model | board = startLoadingNextPage "SIMILAR" model.board }, request )
+
+                Nothing ->
+                    model |> noComand
 
         SaveModifiedItemsOnDemand ->
             saveModifiedItems model
@@ -438,7 +383,7 @@ update msg model =
             ( { model | userProfile = profile }, scheduleNextSync model.userProfile.syncTime )
 
         BoardsLoaded boards ->
-            noComand (List.foldl mergeAndNormalizeResponse model boards)
+            { model | board = List.foldl mergeAndNormalizeResponse model.board boards } |> noComand
 
         CreateNewBoard ->
             ( model, createBoard () )
@@ -451,7 +396,10 @@ update msg model =
                 newProfile =
                     { profile | selectedBoard = boardResponse.id, boards = profile.boards ++ [ boardResponse.id ] }
             in
-            ( mergeAndNormalizeResponse boardResponse model |> updateProfileAndMarkAsNeededToSync newProfile |> markSelectedBoardAsNeededToSync, Cmd.none )
+            { model | board = mergeAndNormalizeResponse boardResponse model.board }
+                |> updateProfileAndMarkAsNeededToSync newProfile
+                |> markSelectedBoardAsNeededToSync
+                |> noComand
 
         StartModifyingItem item ->
             ( { model | renamingState = RenamingItem item }, focus item.itemId |> Task.attempt FocusResult )
@@ -541,7 +489,7 @@ saveModifiedItems model =
                 Cmd.none
 
         boardsToSync =
-            Set.toList model.boardIdsToSync |> List.map (\boardId -> denormalizeBoard boardId model) |> unpackMaybes
+            Set.toList model.boardIdsToSync |> List.map (\boardId -> denormalizeBoard boardId model.board) |> unpackMaybes
 
         syncBoardsCmd =
             if List.isEmpty boardsToSync then
@@ -668,7 +616,7 @@ viewBoard model =
                         (board.children
                             |> List.map (\stackId -> Dict.get stackId model.board.stacks)
                             |> unpackMaybes
-                            |> List.map (\stack -> viewStack model [ class "column-board" ] (getStackToView model.board stack.id))
+                            |> List.map (\stack -> viewStack model [ class "column-board" ] stack.id)
                         )
                         [ button [ class "add-stack-button", onClick CreateSingleId ] [ text "Add column" ], div [ class "post-add-stack-space" ] [] ]
                     )
@@ -683,31 +631,36 @@ viewBoardBar { name } =
     div [ class "board-title" ] [ text name ]
 
 
-viewStack : { a | renamingState : RenamingState, dragState : DragState, videoBeingPlayed : Maybe String } -> List (Attribute Msg) -> ( Stack, List Item ) -> Html Msg
-viewStack { renamingState, dragState, videoBeingPlayed } attributes ( { id, name }, items ) =
-    div (List.append [ class "column-drag-overlay" ] attributes)
-        [ div
-            [ class "column"
-            , classIf (isDraggingItem dragState id) "column-preview"
-            , onMouseEnter (StackEnterDuringDrag id)
-            ]
-            [ div [ class "column-title", onMouseDown (StackTitleMouseDown id) ]
-                [ viewContent renamingState { id = id, name = name }
-                , div [ class "column-title-actions" ]
-                    [ button [ onMouseDownAlwaysStopPropagation (StartModifyingItem { itemId = id, newName = name }), class "icon-button" ] [ img [ src "/icons/edit.svg" ] [] ]
-                    , button [ onMouseDownAlwaysStopPropagation (RemoveStack id), class "icon-button" ] [ img [ src "/icons/delete.svg" ] [] ]
+viewStack : Model -> List (Attribute Msg) -> String -> Html Msg
+viewStack { renamingState, dragState, videoBeingPlayed, board } attributes stackId =
+    case getStackToView board stackId of
+        Just ( { id, name }, items ) ->
+            div (List.append [ class "column-drag-overlay" ] attributes)
+                [ div
+                    [ class "column"
+                    , classIf (isDraggingItem dragState id) "column-preview"
+                    , onMouseEnter (StackEnterDuringDrag id)
                     ]
-                ]
-            , div [ class "column-content" ]
-                (if List.isEmpty items then
-                    [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag id) ] [] ]
+                    [ div [ class "column-title", onMouseDown (StackTitleMouseDown id) ]
+                        [ viewContent renamingState { id = id, name = name }
+                        , div [ class "column-title-actions" ]
+                            [ button [ onMouseDownAlwaysStopPropagation (StartModifyingItem { itemId = id, newName = name }), class "icon-button" ] [ img [ src "/icons/edit.svg" ] [] ]
+                            , button [ onMouseDownAlwaysStopPropagation (RemoveStack id), class "icon-button" ] [ img [ src "/icons/delete.svg" ] [] ]
+                            ]
+                        ]
+                    , div [ class "column-content" ]
+                        (if List.isEmpty items then
+                            [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag id) ] [] ]
 
-                 else
-                    List.map (\item -> viewItem [] dragState videoBeingPlayed item) items
-                )
-            ]
-        , div [ class "column-footer", onMouseEnter (StackOverlayEnterDuringDrag id) ] []
-        ]
+                         else
+                            List.map (\item -> viewItem [] dragState videoBeingPlayed item) items
+                        )
+                    ]
+                , div [ class "column-footer", onMouseEnter (StackOverlayEnterDuringDrag id) ] []
+                ]
+
+        Nothing ->
+            div [] []
 
 
 viewSidebar : Model -> Html Msg
@@ -741,11 +694,23 @@ viewSearch model =
     [ viewSidebarHeader "Search"
     , input [ class "sidebar-search-input", onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
     , div [] (List.map (\item -> viewItem [] model.dragState model.videoBeingPlayed item) items)
-    , elementIf model.isWaitingForSearch (progress [ class "material-progress-linear top" ] [])
-    , elementIf (not (List.isEmpty items) && not model.isLoadingMoreItems)
-        (div [ class "sidebar-bottom-action-container" ] [ button [ onClick LoadMoreSearch, class "dark" ] [ text "load more" ] ])
-    , elementIf model.isLoadingMoreItems (progress [ class "material-progress-linear" ] [])
+    , viewStackFooter LoadMoreSearch "SEARCH" model.board
     ]
+
+
+viewStackFooter msg stackId model =
+    case getStackStatus stackId model of
+        Just (Ready (Just nextPage)) ->
+            div [ class "sidebar-bottom-action-container" ] [ button [ onClick (msg nextPage), class "dark" ] [ text "load more" ] ]
+
+        Just IsLoading ->
+            progress [ class "material-progress-linear top" ] []
+
+        Just IsLoadingNextPage ->
+            progress [ class "material-progress-linear" ] []
+
+        _ ->
+            div [] []
 
 
 viewSimilar model =
@@ -753,22 +718,14 @@ viewSimilar model =
         items =
             getItemsForStack "SIMILAR" model.board
     in
-    [ elementIf model.isLoadingSimilar (progress [ class "material-progress-linear top" ] [])
-    , viewSidebarHeader "Similar"
+    [ viewSidebarHeader "Similar"
     , div [] (List.map (\item -> viewItem [] model.dragState model.videoBeingPlayed item) items)
+    , viewStackFooter LoadMoreSimilar "SIMILAR" model.board
     ]
 
 
 viewSidebarHeader title =
     div [ class "sidebar-header" ] [ h3 [] [ text title ], button [ onClick (SetSidebar Hidden), class "icon-button hide-icon" ] [ img [ src "/icons/chevron.svg" ] [] ] ]
-
-
-elementIf condition element =
-    if condition then
-        element
-
-    else
-        div [] []
 
 
 viewBoards model =
@@ -876,7 +833,7 @@ viewElementBeingDragged model =
                 |> Maybe.withDefault (div [] [])
 
         Just ( StackBeingDragged, elementPosition, stackId ) ->
-            viewStack { renamingState = NoRename, dragState = DragState.init, videoBeingPlayed = model.videoBeingPlayed } (getAttributes elementPosition) (getStackToView model.board stackId)
+            viewStack { model | renamingState = NoRename, dragState = DragState.init } (getAttributes elementPosition) stackId
 
         Just ( BoardBeingDragged, elementPosition, boardId ) ->
             model.board.boards

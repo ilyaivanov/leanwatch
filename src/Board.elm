@@ -14,7 +14,14 @@ type alias Board =
 type alias Stack =
     Parent
         { name : String
+        , stackState : StackStatus
         }
+
+
+type StackStatus
+    = Ready (Maybe String)
+    | IsLoading
+    | IsLoadingNextPage
 
 
 type alias Item =
@@ -31,12 +38,16 @@ type alias BoardModel =
     }
 
 
+makeStack id name =
+    { id = id, name = name, children = [], stackState = Ready Nothing }
+
+
 init : BoardModel
 init =
     { stacks =
         Dict.fromList
-            [ ( "SEARCH", { id = "SEARCH", name = "SEARCH", children = [] } )
-            , ( "SIMILAR", { id = "SIMILAR", name = "SIMILAR", children = [] } )
+            [ ( "SEARCH", makeStack "SEARCH" "SEARCH" )
+            , ( "SIMILAR", makeStack "SIMILAR" "SIMILAR" )
             ]
     , items = Dict.empty
     , boards = Dict.empty
@@ -53,16 +64,13 @@ getItemsForStack stackName model =
         |> unpackMaybes
 
 
-getStackToView : BoardModel -> String -> ( Stack, List Item )
+getStackToView : BoardModel -> String -> Maybe ( Stack, List Item )
 getStackToView model stackId =
-    let
-        stack =
-            getStack stackId model.stacks
-
-        items =
-            stack.children |> List.map (\itemId -> Dict.get itemId model.items) |> unpackMaybes
-    in
-    ( stack, items )
+    getStack stackId model
+        |> Maybe.map
+            (\actualStack ->
+                ( actualStack, actualStack.children |> List.map (\itemId -> Dict.get itemId model.items) |> unpackMaybes )
+            )
 
 
 getItemById : BoardModel -> String -> Maybe Item
@@ -73,9 +81,14 @@ getItemById model itemId =
         |> List.head
 
 
-getStack : String -> Dict String Stack -> Stack
-getStack stackId stacks =
-    Dict.get stackId stacks |> Maybe.withDefault { id = "NOT_FOUND", name = "NOT_FOUND", children = [] }
+getStack : String -> BoardModel -> Maybe Stack
+getStack stackId model =
+    Dict.get stackId model.stacks
+
+
+getStackStatus : String -> BoardModel -> Maybe StackStatus
+getStackStatus stackId model =
+    getStack stackId model |> Maybe.map .stackState
 
 
 setStacks stacks model =
@@ -89,7 +102,7 @@ setBoards boards model =
 createStack boardId newStackId model =
     let
         newStack =
-            { id = newStackId, name = "New Stack", children = [] }
+            { id = newStackId, name = "New Stack", children = [], stackState = Ready Nothing }
 
         newStacks =
             Dict.insert newStackId newStack model.stacks
@@ -104,8 +117,8 @@ removeStack boardId stackId model =
         |> updateBoard boardId (\b -> { b | children = removeItem stackId b.children })
 
 
-getIds items =
-    List.map .id items
+getIds =
+    List.map .id
 
 
 toDic items =
@@ -132,6 +145,10 @@ removeBoard boardId model =
 
 updateBoard boardId updater model =
     { model | boards = Dict.update boardId (Maybe.map (\v -> updater v)) model.boards }
+
+
+updateStack stackId updater model =
+    { model | stacks = Dict.update stackId (Maybe.map (\v -> updater v)) model.stacks }
 
 
 getNextItemInStack : Maybe String -> BoardModel -> Maybe Item
@@ -168,3 +185,74 @@ updateName itemId newName model =
 updateNameInDict : Dict String { a | name : String } -> String -> String -> Dict String { a | name : String }
 updateNameInDict boards boardId newName =
     Dict.update boardId (Maybe.map (\s -> { s | name = newName })) boards
+
+
+startLoading stackId model =
+    model |> updateStack stackId (\s -> { s | stackState = IsLoading })
+
+
+startLoadingNextPage stackId model =
+    model |> updateStack stackId (\s -> { s | stackState = IsLoadingNextPage })
+
+
+onStackLoadingDone : String -> String -> BoardModel -> BoardModel
+onStackLoadingDone stackId nextPageToken model =
+    model |> updateStack stackId (\s -> { s | stackState = Ready (Just nextPageToken) })
+
+
+
+--API HANDLING
+
+
+type alias BoardResponse =
+    { id : String
+    , name : String
+    , stacks :
+        List
+            { id : String
+            , name : String
+            , items :
+                List
+                    { id : String
+                    , name : String
+                    , youtubeId : String
+                    }
+            }
+    }
+
+
+mergeAndNormalizeResponse : BoardResponse -> BoardModel -> BoardModel
+mergeAndNormalizeResponse boardResponse model =
+    let
+        stacks =
+            Dict.fromList (List.map (\s -> ( s.id, { id = s.id, name = s.name, children = getIds s.items, stackState = Ready Nothing } )) boardResponse.stacks)
+
+        allItems =
+            boardResponse.stacks |> List.map (\s -> s.items) |> List.concat
+
+        items =
+            Dict.fromList (List.map (\i -> ( i.id, { id = i.id, name = i.name, youtubeId = i.youtubeId } )) allItems)
+    in
+    { boards = Dict.insert boardResponse.id { id = boardResponse.id, name = boardResponse.name, children = getIds boardResponse.stacks } model.boards
+    , stacks = Dict.union stacks model.stacks
+    , items = Dict.union items model.items
+    }
+
+
+denormalizeBoard : String -> BoardModel -> Maybe BoardResponse
+denormalizeBoard boardId model =
+    Dict.get boardId model.boards
+        |> Maybe.map
+            (\board ->
+                let
+                    stacksNarrow =
+                        board.children |> List.map (\id -> Dict.get id model.stacks) |> unpackMaybes
+
+                    stacks =
+                        stacksNarrow |> List.map (\s -> { id = s.id, name = s.name, items = s.children |> List.map (\id -> Dict.get id model.items) |> unpackMaybes })
+                in
+                { id = board.id
+                , name = board.name
+                , stacks = stacks
+                }
+            )
