@@ -12,4 +12,5 @@
     bottom: 15px;
     width: 400px;
     height: 150px;
+    z-index: 103;
 }
