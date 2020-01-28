@@ -150,6 +150,10 @@ updateBoard boardId updater model =
     { model | boards = Dict.update boardId (Maybe.map (\v -> updater v)) model.boards }
 
 
+updateItem itemId updater model =
+    { model | items = Dict.update itemId (Maybe.map (\v -> updater v)) model.items }
+
+
 updateStack stackId updater model =
     { model | stacks = Dict.update stackId (Maybe.map (\v -> updater v)) model.stacks }
 
@@ -176,6 +180,10 @@ getNextItemInStack itemIdM model =
 
         _ ->
             Nothing
+
+
+updateTimeline videoPlayed timeline model =
+    updateItem videoPlayed (\item -> { item | duration = Just timeline.duration, currentTime = Just timeline.currentTime }) model
 
 
 updateName itemId newName model =
@@ -227,6 +235,12 @@ type alias ItemResponse =
     , youtubeId : String
     , duration : Maybe Float
     , currentTime : Maybe Float
+    }
+
+
+type alias TimeLineInfo =
+    { duration : Float
+    , currentTime : Float
     }
 
 

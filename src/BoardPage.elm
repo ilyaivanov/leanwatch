@@ -1,4 +1,4 @@
-port module BoardPage exposing (Model, Msg(..), createBoard, init, onBoardCreated, onBoardsLoaded, onUserProfileLoaded, onVideoEnded, update, view)
+port module BoardPage exposing (Model, Msg(..), createBoard, init, onBoardCreated, onBoardsLoaded, onUserProfileLoaded, onVideoEnded, onVideoProgress, update, view)
 
 import Board exposing (..)
 import Browser.Dom as Dom exposing (focus)
@@ -49,6 +49,9 @@ port onVideoEnded : (() -> msg) -> Sub msg
 
 
 port onBoardCreated : (BoardResponse -> msg) -> Sub msg
+
+
+port onVideoProgress : (Json.Value -> msg) -> Sub msg
 
 
 
@@ -115,6 +118,7 @@ type Msg
       -- Commands
     | CreateSingleId
     | VideoEnded ()
+    | UpdateTimeline TimeLineInfo
       -- Debounced search
     | AttemptToSearch String
     | DebouncedSearch String String
@@ -354,6 +358,12 @@ update msg model =
 
                 Nothing ->
                     model |> noComand
+
+        UpdateTimeline timeline ->
+            model.videoBeingPlayed
+                |> Maybe.map (\videoPlayed -> { model | board = updateTimeline videoPlayed timeline model.board })
+                |> Maybe.withDefault model
+                |> noComand
 
         SaveModifiedItemsOnDemand ->
             saveModifiedItems model
