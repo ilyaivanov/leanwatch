@@ -187,7 +187,7 @@
     background-color: #d7d7d7;
 }
 
-.item-preview .item-image {
+.item-preview > * {
     display: none;
 }
 
