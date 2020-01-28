@@ -3,7 +3,7 @@ port module BoardPage exposing (Model, Msg(..), createBoard, init, onBoardCreate
 import Board exposing (..)
 import Browser.Dom as Dom exposing (focus)
 import Dict exposing (Dict)
-import DictMoves exposing (Parent, getParentByChildren)
+import DictMoves exposing (Parent)
 import DragState exposing (..)
 import Html exposing (..)
 import Html.Attributes as Attributes exposing (..)
@@ -16,7 +16,7 @@ import Random
 import Set exposing (Set)
 import Task
 import Utils.ExtraEvents exposing (..)
-import Utils.Other exposing (flip, getNextItem, ifNothing, maybeHasValue, removeItem, unpackMaybes)
+import Utils.Other exposing (flip, ifNothing, maybeHasValue, removeItem, unpackMaybes)
 
 
 noComand : Model -> ( Model, Cmd msg )
