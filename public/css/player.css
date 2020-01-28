@@ -1,7 +1,7 @@
 .cinema-player {
     height: calc((9 / 16) * 100vw);
     max-height: calc(100vh - 169px);
-    min-height: 480px;
+    min-height: 640px;
     width: var(--board-width);
     float: left;
 }
