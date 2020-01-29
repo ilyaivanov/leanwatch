@@ -16,6 +16,7 @@ type alias Stack =
     Parent
         { name : String
         , stackState : StackStatus
+        , playlistId : Maybe String
         }
 
 
@@ -44,7 +45,7 @@ type alias BoardModel =
 
 
 makeStack id name =
-    { id = id, name = name, children = [], stackState = Ready Nothing }
+    { id = id, name = name, children = [], stackState = Ready Nothing, playlistId = Nothing }
 
 
 init : BoardModel
@@ -107,7 +108,7 @@ setBoards boards model =
 createStack boardId newStackId model =
     let
         newStack =
-            { id = newStackId, name = "New Stack", children = [], stackState = Ready Nothing }
+            { id = newStackId, name = "New Stack", children = [], playlistId = Nothing, stackState = Ready Nothing }
 
         newStacks =
             Dict.insert newStackId newStack model.stacks
@@ -117,17 +118,17 @@ createStack boardId newStackId model =
         |> updateBoard boardId (\b -> { b | children = List.append b.children [ newStackId ] })
 
 
-createPlaylist { boardId, playlistId, playlistName } model =
+createPlaylist { boardId, stackId, playlistId, playlistName } model =
     let
         newStack =
-            { id = playlistId, name = playlistName, children = [], stackState = IsLoading }
+            { id = stackId, name = playlistName, playlistId = Just playlistId, children = [], stackState = IsLoading }
 
         newStacks =
-            Dict.insert playlistId newStack model.stacks
+            Dict.insert stackId newStack model.stacks
     in
     model
         |> setStacks newStacks
-        |> updateBoard boardId (\b -> { b | children = List.append [ playlistId ] b.children })
+        |> updateBoard boardId (\b -> { b | children = List.append [ stackId ] b.children })
 
 
 removeStack boardId stackId model =
@@ -240,6 +241,8 @@ type alias BoardResponse =
 type alias StackResponse =
     { id : String
     , name : String
+    , playlistId : Maybe String
+    , nextPage : Maybe String
     , items : List Item
     }
 
@@ -265,9 +268,11 @@ decodeBoard =
 
 decodeStack : Json.Decoder StackResponse
 decodeStack =
-    Json.map3 StackResponse
+    Json.map5 StackResponse
         (Json.field "id" Json.string)
         (Json.field "name" Json.string)
+        (Json.maybe (Json.field "playlistId" Json.string))
+        (Json.maybe (Json.field "nextPage" Json.string))
         (Json.field "items" (Json.list decodeItem))
 
 
@@ -287,7 +292,7 @@ mergeAndNormalizeResponse : BoardResponse -> BoardModel -> BoardModel
 mergeAndNormalizeResponse boardResponse model =
     let
         stacks =
-            Dict.fromList (List.map (\s -> ( s.id, { id = s.id, name = s.name, children = getIds s.items, stackState = Ready Nothing } )) boardResponse.stacks)
+            Dict.fromList (List.map (\s -> ( s.id, { id = s.id, name = s.name, children = getIds s.items, playlistId = s.playlistId, stackState = Ready s.nextPage } )) boardResponse.stacks)
 
         allItems =
             boardResponse.stacks |> List.map (\s -> s.items) |> List.concat
@@ -310,8 +315,20 @@ denormalizeBoard boardId model =
                     stacksNarrow =
                         board.children |> List.map (\id -> Dict.get id model.stacks) |> unpackMaybes
 
+                    mapPage stackState =
+                        case stackState of
+                            Ready (Just nextPage) ->
+                                Just nextPage
+
+                            _ ->
+                                Nothing
+
+                    mapStack : Stack -> StackResponse
+                    mapStack s =
+                        { id = s.id, name = s.name, playlistId = s.playlistId, items = s.children |> List.map (\id -> Dict.get id model.items) |> unpackMaybes, nextPage = mapPage s.stackState }
+
                     stacks =
-                        stacksNarrow |> List.map (\s -> { id = s.id, name = s.name, items = s.children |> List.map (\id -> Dict.get id model.items) |> unpackMaybes })
+                        stacksNarrow |> List.map mapStack
                 in
                 { id = board.id
                 , name = board.name

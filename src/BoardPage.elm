@@ -138,6 +138,7 @@ type Msg
     | FinishLoadingPage String (Result Http.Error SearchResponse)
     | LoadMoreSearch String
     | LoadMoreSimilar String
+    | LoadMorePlaylist Stack String
     | SearchSimilar Item
     | LoadPlaylist Item String
     | LoadPlaylistClick Item
@@ -331,7 +332,7 @@ update msg model =
             ( model, Cmd.batch [ Random.generate (LoadPlaylist playlistItem) createId, scrollToLeft "columns-container" ] )
 
         LoadPlaylist playlistItem newId ->
-            { model | board = createPlaylist { boardId = model.userProfile.selectedBoard, playlistId = newId, playlistName = playlistItem.name } model.board }
+            { model | board = createPlaylist { boardId = model.userProfile.selectedBoard, stackId = newId, playlistId = playlistItem.itemId, playlistName = playlistItem.name } model.board }
                 |> markSelectedBoardAsNeededToSync
                 |> withCommand (loadPlaylist (FinishLoadingItems newId) playlistItem.itemId)
 
@@ -339,6 +340,14 @@ update msg model =
             ( { model | board = startLoadingNextPage "SEARCH" model.board }
             , loadNextPageForSearch (FinishLoadingPage "SEARCH") model.searchTerm nextPage
             )
+
+        LoadMorePlaylist item nextPage ->
+            let
+                command =
+                    item.playlistId |> Maybe.map (\playlist -> loadPlaylistNextPage (FinishLoadingPage item.id) playlist nextPage) |> Maybe.withDefault Cmd.none
+            in
+            { model | board = startLoadingNextPage item.id model.board }
+                |> withCommand command
 
         SearchSimilar item ->
             ( { model | sidebarState = Similar, board = startLoading "SIMILAR" model.board, similarItem = Just item }
@@ -625,7 +634,11 @@ viewBoardBar { name } =
 viewStack : Model -> List (Attribute Msg) -> String -> Html Msg
 viewStack { renamingState, dragState, videoBeingPlayed, board } attributes stackId =
     case getStackToView board stackId of
-        Just ( { id, name }, items ) ->
+        Just ( stack, items ) ->
+            let
+                { id, name } =
+                    stack
+            in
             div (List.append [ class "column-drag-overlay" ] attributes)
                 [ div
                     [ class "column"
@@ -640,11 +653,14 @@ viewStack { renamingState, dragState, videoBeingPlayed, board } attributes stack
                             ]
                         ]
                     , div [ class "column-content" ]
-                        (if List.isEmpty items then
-                            [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag id) ] [] ]
+                        (List.append
+                            (if List.isEmpty items then
+                                [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag id) ] [] ]
 
-                         else
-                            List.map (\item -> viewItem [] dragState videoBeingPlayed item) items
+                             else
+                                List.map (\item -> viewItem [] dragState videoBeingPlayed item) items
+                            )
+                            [ viewStackStatus (LoadMorePlaylist stack) id board ]
                         )
                     ]
                 , div [ class "column-footer", onMouseEnter (StackOverlayEnterDuringDrag id) ] []
@@ -685,11 +701,11 @@ viewSearch model =
     [ viewSidebarHeader "Search"
     , input [ class "sidebar-search-input", onInput OnSearchInput, placeholder "Find videos by name...", value model.searchTerm ] []
     , div [] (List.map (\item -> viewItem [] model.dragState model.videoBeingPlayed item) items)
-    , viewStackFooter LoadMoreSearch "SEARCH" model.board
+    , viewStackStatus LoadMoreSearch "SEARCH" model.board
     ]
 
 
-viewStackFooter msg stackId model =
+viewStackStatus msg stackId model =
     case getStackStatus stackId model of
         Just (Ready (Just nextPage)) ->
             div [ class "sidebar-bottom-action-container" ] [ button [ onClick (msg nextPage), class "dark" ] [ text "load more" ] ]
@@ -718,7 +734,7 @@ viewSimilar model =
     [ viewSidebarHeader "Similar"
     , similarElement
     , div [] (List.map (\item -> viewItem [] model.dragState model.videoBeingPlayed item) items)
-    , viewStackFooter LoadMoreSimilar "SIMILAR" model.board
+    , viewStackStatus LoadMoreSimilar "SIMILAR" model.board
     ]
 
 
