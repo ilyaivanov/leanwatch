@@ -200,6 +200,7 @@
     align-items: center;
     font-size: 14px;
     max-height: 48px;
+    margin-bottom: var(--card-progress-height);
 }
 
 .item-dragged {
