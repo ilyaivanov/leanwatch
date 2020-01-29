@@ -66,4 +66,8 @@ suite =
             (\_ ->
                 formatTime (2 * 60 + 5 + 0.25) |> Expect.equal "2:05"
             )
+        , test "Formatting 0:18"
+            (\_ ->
+                formatTime 18.25 |> Expect.equal "0:18"
+            )
         ]

@@ -11,6 +11,7 @@ import Html.Events exposing (onBlur, onClick, onInput)
 import Http
 import Json.Decode as Json
 import Login
+import Ports exposing (scrollItemToBeginning)
 import Process
 import Random
 import Set exposing (Set)
@@ -342,7 +343,7 @@ update msg model =
                         , expect = Http.expectJson (FinishLoadingItems "SIMILAR") decodeItems
                         }
             in
-            ( { model | sidebarState = Similar, board = startLoading "SIMILAR" model.board, similarItem = Just item }, request )
+            ( { model | sidebarState = Similar, board = startLoading "SIMILAR" model.board, similarItem = Just item }, Cmd.batch [ request, scrollItemToBeginning "sidebar" ] )
 
         LoadMoreSimilar nextPage ->
             case model.similarItem of
@@ -669,15 +670,15 @@ viewSidebar : Model -> Html Msg
 viewSidebar model =
     case model.sidebarState of
         Search ->
-            div [ class "sidebar" ]
+            div [ class "sidebar", id "sidebar" ]
                 (viewSearch model)
 
         Boards ->
-            div [ class "sidebar" ]
+            div [ class "sidebar", id "sidebar" ]
                 (viewBoards model)
 
         Similar ->
-            div [ class "sidebar" ]
+            div [ class "sidebar", id "sidebar" ]
                 (viewSimilar model)
 
         Hidden ->
@@ -719,8 +720,15 @@ viewSimilar model =
     let
         items =
             getItemsForStack "SIMILAR" model.board
+
+        similarTitle itemName =
+            div [ class "small-text", style "font-weight" "bold" ] [ text itemName ]
+
+        similarElement =
+            Maybe.map .name model.similarItem |> Maybe.map similarTitle |> Maybe.withDefault (div [] [])
     in
     [ viewSidebarHeader "Similar"
+    , similarElement
     , div [] (List.map (\item -> viewItem [] model.dragState model.videoBeingPlayed item) items)
     , viewStackFooter LoadMoreSimilar "SIMILAR" model.board
     ]
