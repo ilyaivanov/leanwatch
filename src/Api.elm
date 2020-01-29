@@ -49,6 +49,13 @@ loadPlaylist msg playlistId =
         }
 
 
+loadPlaylistNextPage msg playlistId page =
+    Http.get
+        { url = base ++ "getPlaylistItems?playlistId=" ++ playlistId ++ "&pageToken=" ++ page
+        , expect = Http.expectJson msg decodeItems
+        }
+
+
 type alias SearchResponse =
     { items : List Item
     , nextPageToken : Maybe String
