@@ -29,6 +29,8 @@ type alias Item =
     { id : String
     , name : String
     , itemId : String
+    , itemType : String
+    , image : Maybe String
     , duration : Maybe Float
     , currentTime : Maybe Float
     }
@@ -258,10 +260,12 @@ decodeStack =
 
 decodeItem : Json.Decoder Item
 decodeItem =
-    Json.map5 Item
+    Json.map7 Item
         (Json.field "id" Json.string)
         (Json.field "name" Json.string)
         (Json.oneOf [ Json.field "youtubeId" Json.string, Json.field "itemId" Json.string ])
+        (Json.oneOf [ Json.field "itemType" Json.string, Json.field "type" Json.string, Json.succeed "video" ])
+        (Json.maybe (Json.field "image" Json.string))
         (Json.maybe (Json.field "duration" Json.float))
         (Json.maybe (Json.field "currentTime" Json.float))
 
