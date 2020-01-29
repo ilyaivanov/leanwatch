@@ -1,5 +1,6 @@
 port module BoardPage exposing (Model, Msg(..), createBoard, init, onBoardCreated, onBoardsLoaded, onUserProfileLoaded, onVideoEnded, onVideoProgress, update, view)
 
+import Api exposing (..)
 import Board exposing (..)
 import Browser.Dom as Dom exposing (focus)
 import Dict exposing (Dict)
@@ -185,12 +186,6 @@ type alias UserProfile =
     }
 
 
-type alias SearchResponse =
-    { items : List Item
-    , nextPageToken : String
-    }
-
-
 
 -- UPDATE
 
@@ -287,20 +282,6 @@ update msg model =
         AttemptToSearch searchId ->
             ( { model | currentSearchId = searchId }, Process.sleep 500 |> Task.perform (always (DebouncedSearch searchId model.searchTerm)) )
 
-        DebouncedSearch id term ->
-            let
-                request =
-                    Http.get
-                        { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?q=" ++ term
-                        , expect = Http.expectJson (FinishLoadingItems "SEARCH") decodeItems
-                        }
-            in
-            if id == model.currentSearchId then
-                ( { model | currentSearchId = "", board = startLoading "SEARCH" model.board }, request )
-
-            else
-                ( model, Cmd.none )
-
         FinishLoadingItems stackId response ->
             case response of
                 Ok body ->
@@ -325,37 +306,31 @@ update msg model =
                 Err error ->
                     model |> noComand
 
+        DebouncedSearch id term ->
+            if id == model.currentSearchId then
+                ( { model | currentSearchId = "", board = startLoading "SEARCH" model.board }
+                , findVideos (FinishLoadingItems "SEARCH") term
+                )
+
+            else
+                ( model, Cmd.none )
+
         LoadMoreSearch nextPage ->
-            let
-                request =
-                    Http.get
-                        { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?q=" ++ model.searchTerm ++ "&pageToken=" ++ nextPage
-                        , expect = Http.expectJson (FinishLoadingPage "SEARCH") decodeItems
-                        }
-            in
-            ( { model | board = startLoadingNextPage "SEARCH" model.board }, request )
+            ( { model | board = startLoadingNextPage "SEARCH" model.board }
+            , loadNextPageForSearch (FinishLoadingPage "SEARCH") model.searchTerm nextPage
+            )
 
         SearchSimilar item ->
-            let
-                request =
-                    Http.get
-                        { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?relatedToVideoId=" ++ item.youtubeId ++ "&type=video"
-                        , expect = Http.expectJson (FinishLoadingItems "SIMILAR") decodeItems
-                        }
-            in
-            ( { model | sidebarState = Similar, board = startLoading "SIMILAR" model.board, similarItem = Just item }, Cmd.batch [ request, scrollItemToBeginning "sidebar" ] )
+            ( { model | sidebarState = Similar, board = startLoading "SIMILAR" model.board, similarItem = Just item }
+            , Cmd.batch [ findSimilar (FinishLoadingItems "SIMILAR") item.youtubeId, scrollItemToBeginning "sidebar" ]
+            )
 
         LoadMoreSimilar nextPage ->
             case model.similarItem of
                 Just item ->
-                    let
-                        request =
-                            Http.get
-                                { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?relatedToVideoId=" ++ item.youtubeId ++ "&type=video&pageToken=" ++ nextPage
-                                , expect = Http.expectJson (FinishLoadingPage "SIMILAR") decodeItems
-                                }
-                    in
-                    ( { model | board = startLoadingNextPage "SIMILAR" model.board }, request )
+                    ( { model | board = startLoadingNextPage "SIMILAR" model.board }
+                    , loadNextPageForSimilar (FinishLoadingPage "SIMILAR") item.youtubeId nextPage
+                    )
 
                 Nothing ->
                     model |> noComand
@@ -524,13 +499,6 @@ finishModification model =
 
         NoRename ->
             model
-
-
-decodeItems : Json.Decoder SearchResponse
-decodeItems =
-    Json.map2 SearchResponse
-        (Json.field "items" (Json.list decodeItem))
-        (Json.field "nextPageToken" Json.string)
 
 
 createId =
