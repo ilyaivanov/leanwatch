@@ -5,30 +5,39 @@ import Http
 import Json.Decode as Json
 
 
+
+--base =
+--    "https://europe-west1-lean-watch.cloudfunctions.net/"
+
+
+base =
+    "http://localhost:5000/lean-watch/us-central1/"
+
+
 findVideos msg term =
     Http.get
-        { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?q=" ++ term
+        { url = base ++ "getVideos?q=" ++ term
         , expect = Http.expectJson msg decodeItems
         }
 
 
 loadNextPageForSearch msg search page =
     Http.get
-        { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?q=" ++ search ++ "&pageToken=" ++ page
+        { url = base ++ "getVideos?q=" ++ search ++ "&pageToken=" ++ page
         , expect = Http.expectJson msg decodeItems
         }
 
 
 findSimilar msg youtubeId =
     Http.get
-        { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?relatedToVideoId=" ++ youtubeId ++ "&type=video"
+        { url = base ++ "getVideos?relatedToVideoId=" ++ youtubeId ++ "&type=video"
         , expect = Http.expectJson msg decodeItems
         }
 
 
 loadNextPageForSimilar msg youtubeId page =
     Http.get
-        { url = "https://europe-west1-lean-watch.cloudfunctions.net/getVideos?relatedToVideoId=" ++ youtubeId ++ "&type=video&pageToken=" ++ page
+        { url = base ++ "getVideos?relatedToVideoId=" ++ youtubeId ++ "&type=video&pageToken=" ++ page
         , expect = Http.expectJson msg decodeItems
         }
 
