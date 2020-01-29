@@ -786,7 +786,7 @@ viewItem atts dragState videoBeingPlayed item =
             atts
         )
         [ div [ class "item-image-container" ]
-            [ img [ draggable "false", class "item-image", src ("https://i.ytimg.com/vi/" ++ item.itemId ++ "/mqdefault.jpg") ] []
+            [ img [ draggable "false", class "item-image", src (getItemImage item) ] []
             , viewItemDuration item
             ]
         , span [ class "item-text" ] [ text item.name ]
@@ -798,13 +798,34 @@ viewItem atts dragState videoBeingPlayed item =
         ]
 
 
+getItemImage : Item -> String
+getItemImage item =
+    case ( item.itemType, item.image ) of
+        ( "video", _ ) ->
+            "https://i.ytimg.com/vi/" ++ item.itemId ++ "/mqdefault.jpg"
+
+        ( "channel", Just image ) ->
+            image
+
+        ( "playlist", Just image ) ->
+            image
+
+        _ ->
+            ""
+
+
 viewItemDuration item =
     case item.duration of
         Just duration ->
             div [ class "item-duration" ] [ text (formatTime duration) ]
 
         Nothing ->
-            div [] []
+            case item.itemType of
+                "video" ->
+                    div [] []
+
+                _ ->
+                    div [ class "item-duration" ] [ text item.itemType ]
 
 
 viewItemProgress : Item -> Html msg
