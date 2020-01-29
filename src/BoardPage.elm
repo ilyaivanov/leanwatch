@@ -12,7 +12,7 @@ import Html.Events exposing (onBlur, onClick, onInput)
 import Http
 import Json.Decode as Json
 import Login
-import Ports exposing (scrollItemToBeginning)
+import Ports exposing (scrollToLeft, scrollToTop)
 import Process
 import Random
 import Set exposing (Set)
@@ -23,6 +23,16 @@ import Utils.Other exposing (..)
 
 noComand : Model -> ( Model, Cmd msg )
 noComand model =
+    ( model, Cmd.none )
+
+
+withCommand : Cmd msg -> Model -> ( Model, Cmd msg )
+withCommand cmd model =
+    ( model, cmd )
+
+
+withoutCommand : Model -> ( Model, Cmd msg )
+withoutCommand model =
     ( model, Cmd.none )
 
 
@@ -129,6 +139,8 @@ type Msg
     | LoadMoreSearch String
     | LoadMoreSimilar String
     | SearchSimilar Item
+    | LoadPlaylist Item String
+    | LoadPlaylistClick Item
       -- Sidebar
     | SetSidebar SidebarState
       -- Board Management
@@ -315,6 +327,14 @@ update msg model =
             else
                 ( model, Cmd.none )
 
+        LoadPlaylistClick playlistItem ->
+            ( model, Cmd.batch [ Random.generate (LoadPlaylist playlistItem) createId, scrollToLeft "columns-container" ] )
+
+        LoadPlaylist playlistItem newId ->
+            { model | board = createPlaylist { boardId = model.userProfile.selectedBoard, playlistId = newId, playlistName = playlistItem.name } model.board }
+                |> markSelectedBoardAsNeededToSync
+                |> withCommand (loadPlaylist (FinishLoadingItems newId) playlistItem.itemId)
+
         LoadMoreSearch nextPage ->
             ( { model | board = startLoadingNextPage "SEARCH" model.board }
             , loadNextPageForSearch (FinishLoadingPage "SEARCH") model.searchTerm nextPage
@@ -322,7 +342,7 @@ update msg model =
 
         SearchSimilar item ->
             ( { model | sidebarState = Similar, board = startLoading "SIMILAR" model.board, similarItem = Just item }
-            , Cmd.batch [ findSimilar (FinishLoadingItems "SIMILAR") item.itemId, scrollItemToBeginning "sidebar" ]
+            , Cmd.batch [ findSimilar (FinishLoadingItems "SIMILAR") item.itemId, scrollToTop "sidebar" ]
             )
 
         LoadMoreSimilar nextPage ->
@@ -582,7 +602,7 @@ viewBoard model =
                 [ viewPlayer model
                 , viewBoardBar board
                 , div
-                    [ class "columns-container" ]
+                    [ class "columns-container", id "columns-container" ]
                     (List.append
                         (board.children
                             |> List.map (\stackId -> Dict.get stackId model.board.stacks)
@@ -793,7 +813,7 @@ viewItem atts dragState videoBeingPlayed item =
         , viewItemProgress item
         , div [ class "item-click-overlay", onMouseEnter (ItemEnterDuringDrag item.id) ]
             [ div [ class "item-drag-mouse-down-area", onMouseDown (ItemMouseDown item.id) ] []
-            , div [ class "item-icon-area", onClick (SearchSimilar item) ] [ img [ draggable "false", src "/icons/similar.svg" ] [] ]
+            , viewItemIcon item
             ]
         ]
 
@@ -812,6 +832,18 @@ getItemImage item =
 
         _ ->
             ""
+
+
+viewItemIcon item =
+    case item.itemType of
+        "video" ->
+            div [ class "item-icon-area", onClick (SearchSimilar item) ] [ img [ draggable "false", src "/icons/similar.svg" ] [] ]
+
+        "playlist" ->
+            div [ class "item-icon-area", onClick (LoadPlaylistClick item) ] [ img [ draggable "false", src "/icons/loadPlaylist.svg" ] [] ]
+
+        _ ->
+            div [] []
 
 
 viewItemDuration item =

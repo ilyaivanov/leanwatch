@@ -117,6 +117,19 @@ createStack boardId newStackId model =
         |> updateBoard boardId (\b -> { b | children = List.append b.children [ newStackId ] })
 
 
+createPlaylist { boardId, playlistId, playlistName } model =
+    let
+        newStack =
+            { id = playlistId, name = playlistName, children = [], stackState = IsLoading }
+
+        newStacks =
+            Dict.insert playlistId newStack model.stacks
+    in
+    model
+        |> setStacks newStacks
+        |> updateBoard boardId (\b -> { b | children = List.append [ playlistId ] b.children })
+
+
 removeStack boardId stackId model =
     model
         |> updateBoard boardId (\b -> { b | children = removeItem stackId b.children })
@@ -208,9 +221,9 @@ startLoadingNextPage stackId model =
     model |> updateStack stackId (\s -> { s | stackState = IsLoadingNextPage })
 
 
-onStackLoadingDone : String -> String -> BoardModel -> BoardModel
+onStackLoadingDone : String -> Maybe String -> BoardModel -> BoardModel
 onStackLoadingDone stackId nextPageToken model =
-    model |> updateStack stackId (\s -> { s | stackState = Ready (Just nextPageToken) })
+    model |> updateStack stackId (\s -> { s | stackState = Ready nextPageToken })
 
 
 
