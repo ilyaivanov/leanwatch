@@ -226,7 +226,7 @@ update msg model =
                 nextCommand =
                     item
                         |> Maybe.andThen (getItemById model.board)
-                        |> Maybe.map .youtubeId
+                        |> Maybe.map .itemId
                         |> Maybe.map play
                         |> Maybe.withDefault Cmd.none
 
@@ -322,14 +322,14 @@ update msg model =
 
         SearchSimilar item ->
             ( { model | sidebarState = Similar, board = startLoading "SIMILAR" model.board, similarItem = Just item }
-            , Cmd.batch [ findSimilar (FinishLoadingItems "SIMILAR") item.youtubeId, scrollItemToBeginning "sidebar" ]
+            , Cmd.batch [ findSimilar (FinishLoadingItems "SIMILAR") item.itemId, scrollItemToBeginning "sidebar" ]
             )
 
         LoadMoreSimilar nextPage ->
             case model.similarItem of
                 Just item ->
                     ( { model | board = startLoadingNextPage "SIMILAR" model.board }
-                    , loadNextPageForSimilar (FinishLoadingPage "SIMILAR") item.youtubeId nextPage
+                    , loadNextPageForSimilar (FinishLoadingPage "SIMILAR") item.itemId nextPage
                     )
 
                 Nothing ->
@@ -434,7 +434,7 @@ update msg model =
         VideoEnded _ ->
             case getNextItemInStack model.videoBeingPlayed model.board of
                 Just nextItem ->
-                    ( { model | videoBeingPlayed = Just nextItem.id }, play nextItem.youtubeId )
+                    ( { model | videoBeingPlayed = Just nextItem.id }, play nextItem.itemId )
 
                 Nothing ->
                     ( model, Cmd.none )
@@ -786,7 +786,7 @@ viewItem atts dragState videoBeingPlayed item =
             atts
         )
         [ div [ class "item-image-container" ]
-            [ img [ draggable "false", class "item-image", src ("https://i.ytimg.com/vi/" ++ item.youtubeId ++ "/mqdefault.jpg") ] []
+            [ img [ draggable "false", class "item-image", src ("https://i.ytimg.com/vi/" ++ item.itemId ++ "/mqdefault.jpg") ] []
             , viewItemDuration item
             ]
         , span [ class "item-text" ] [ text item.name ]

@@ -28,7 +28,7 @@ type StackStatus
 type alias Item =
     { id : String
     , name : String
-    , youtubeId : String
+    , itemId : String
     , duration : Maybe Float
     , currentTime : Maybe Float
     }
@@ -225,16 +225,7 @@ type alias BoardResponse =
 type alias StackResponse =
     { id : String
     , name : String
-    , items : List ItemResponse
-    }
-
-
-type alias ItemResponse =
-    { id : String
-    , name : String
-    , youtubeId : String
-    , duration : Maybe Float
-    , currentTime : Maybe Float
+    , items : List Item
     }
 
 
@@ -265,12 +256,12 @@ decodeStack =
         (Json.field "items" (Json.list decodeItem))
 
 
-decodeItem : Json.Decoder ItemResponse
+decodeItem : Json.Decoder Item
 decodeItem =
-    Json.map5 ItemResponse
+    Json.map5 Item
         (Json.field "id" Json.string)
         (Json.field "name" Json.string)
-        (Json.field "youtubeId" Json.string)
+        (Json.oneOf [ Json.field "youtubeId" Json.string, Json.field "itemId" Json.string ])
         (Json.maybe (Json.field "duration" Json.float))
         (Json.maybe (Json.field "currentTime" Json.float))
 
