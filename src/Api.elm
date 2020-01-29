@@ -5,13 +5,13 @@ import Http
 import Json.Decode as Json
 
 
+base =
+    "https://europe-west1-lean-watch.cloudfunctions.net/"
+
+
 
 --base =
---    "https://europe-west1-lean-watch.cloudfunctions.net/"
-
-
-base =
-    "http://localhost:5000/lean-watch/us-central1/"
+--    "http://localhost:5000/lean-watch/us-central1/"
 
 
 findVideos msg term =
@@ -42,9 +42,16 @@ loadNextPageForSimilar msg youtubeId page =
         }
 
 
+loadPlaylist msg playlistId =
+    Http.get
+        { url = base ++ "getPlaylistItems?playlistId=" ++ playlistId
+        , expect = Http.expectJson msg decodeItems
+        }
+
+
 type alias SearchResponse =
     { items : List Item
-    , nextPageToken : String
+    , nextPageToken : Maybe String
     }
 
 
@@ -52,4 +59,4 @@ decodeItems : Json.Decoder SearchResponse
 decodeItems =
     Json.map2 SearchResponse
         (Json.field "items" (Json.list decodeItem))
-        (Json.field "nextPageToken" Json.string)
+        (Json.maybe (Json.field "nextPageToken" Json.string))
