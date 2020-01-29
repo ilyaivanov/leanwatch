@@ -46,6 +46,15 @@ function registerFirebase(ports) {
     ports.onBoardCreated.send({id: ref.id, name: "First Board", stacks: []});
   });
 
+  ports.scrollItemToBeginning.subscribe(function (elementId) {
+    const elememt = document.getElementById(elementId);
+    if (elememt) {
+      elememt.scrollTo({left: 0, top: 0, behavior: "smooth"});
+    } else {
+      console.error("Can't find element with id " + elementId);
+    }
+  });
+
 }
 
 function handleUserLogin(user, onSuccess) {
