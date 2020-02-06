@@ -15,6 +15,7 @@ type alias Board =
 type alias Stack =
     Parent
         { name : String
+        , stackType : String
         , stackState : StackStatus
         , playlistId : Maybe String
         }
@@ -45,7 +46,7 @@ type alias BoardModel =
 
 
 makeStack id name =
-    { id = id, name = name, children = [], stackState = Ready Nothing, playlistId = Nothing }
+    { id = id, name = name, children = [], stackState = Ready Nothing, stackType = "UserCreated", playlistId = Nothing }
 
 
 init : BoardModel
@@ -108,7 +109,7 @@ setBoards boards model =
 createStack boardId newStackId model =
     let
         newStack =
-            { id = newStackId, name = "New Stack", children = [], playlistId = Nothing, stackState = Ready Nothing }
+            { id = newStackId, name = "New Stack", children = [], playlistId = Nothing, stackType = "UserCreated", stackState = Ready Nothing }
 
         newStacks =
             Dict.insert newStackId newStack model.stacks
@@ -121,7 +122,20 @@ createStack boardId newStackId model =
 createPlaylist { boardId, stackId, playlistId, playlistName } model =
     let
         newStack =
-            { id = stackId, name = playlistName, playlistId = Just playlistId, children = [], stackState = IsLoading }
+            { id = stackId, name = playlistName, playlistId = Just playlistId, children = [], stackType = "YoutubePlaylist", stackState = IsLoading }
+
+        newStacks =
+            Dict.insert stackId newStack model.stacks
+    in
+    model
+        |> setStacks newStacks
+        |> updateBoard boardId (\b -> { b | children = List.append [ stackId ] b.children })
+
+
+createChannel { boardId, stackId, channelId, channelName } model =
+    let
+        newStack =
+            { id = stackId, name = channelName, playlistId = Just channelId, children = [], stackType = "YoutubeChannel", stackState = IsLoading }
 
         newStacks =
             Dict.insert stackId newStack model.stacks
@@ -242,6 +256,7 @@ type alias StackResponse =
     { id : String
     , name : String
     , playlistId : Maybe String
+    , stackType : String
     , nextPage : Maybe String
     , items : List Item
     }
@@ -268,10 +283,11 @@ decodeBoard =
 
 decodeStack : Json.Decoder StackResponse
 decodeStack =
-    Json.map5 StackResponse
+    Json.map6 StackResponse
         (Json.field "id" Json.string)
         (Json.field "name" Json.string)
         (Json.maybe (Json.field "playlistId" Json.string))
+        (Json.oneOf [ Json.field "stackType" Json.string, Json.succeed "UserCreated" ])
         (Json.maybe (Json.field "nextPage" Json.string))
         (Json.field "items" (Json.list decodeItem))
 
@@ -292,7 +308,7 @@ mergeAndNormalizeResponse : BoardResponse -> BoardModel -> BoardModel
 mergeAndNormalizeResponse boardResponse model =
     let
         stacks =
-            Dict.fromList (List.map (\s -> ( s.id, { id = s.id, name = s.name, children = getIds s.items, playlistId = s.playlistId, stackState = Ready s.nextPage } )) boardResponse.stacks)
+            Dict.fromList (List.map (\s -> ( s.id, { id = s.id, stackType = s.stackType, name = s.name, children = getIds s.items, playlistId = s.playlistId, stackState = Ready s.nextPage } )) boardResponse.stacks)
 
         allItems =
             boardResponse.stacks |> List.map (\s -> s.items) |> List.concat
@@ -325,7 +341,7 @@ denormalizeBoard boardId model =
 
                     mapStack : Stack -> StackResponse
                     mapStack s =
-                        { id = s.id, name = s.name, playlistId = s.playlistId, items = s.children |> List.map (\id -> Dict.get id model.items) |> unpackMaybes, nextPage = mapPage s.stackState }
+                        { id = s.id, name = s.name, stackType = s.stackType, playlistId = s.playlistId, items = s.children |> List.map (\id -> Dict.get id model.items) |> unpackMaybes, nextPage = mapPage s.stackState }
 
                     stacks =
                         stacksNarrow |> List.map mapStack

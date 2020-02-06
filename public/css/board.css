@@ -103,6 +103,11 @@
     /* background-color: rgb(234, 253, 205); */
 }
 
+.channel-buttons{
+    display: flex;
+    flex-direction: row;
+}
+
 /* CARDS */
 
 .item {

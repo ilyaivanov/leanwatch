@@ -142,6 +142,8 @@ type Msg
     | SearchSimilar Item
     | LoadPlaylist Item String
     | LoadPlaylistClick Item
+    | LoadChannel Item String
+    | LoadChannelClick Item
       -- Sidebar
     | SetSidebar SidebarState
       -- Board Management
@@ -335,6 +337,12 @@ update msg model =
             { model | board = createPlaylist { boardId = model.userProfile.selectedBoard, stackId = newId, playlistId = playlistItem.itemId, playlistName = playlistItem.name } model.board }
                 |> markSelectedBoardAsNeededToSync
                 |> withCommand (loadPlaylist (FinishLoadingItems newId) playlistItem.itemId)
+
+        LoadChannelClick channelItem ->
+            ( model, Cmd.batch [ Random.generate (LoadChannel channelItem) createId, scrollToLeft "columns-container" ] )
+
+        LoadChannel channelItem newId ->
+            { model | board = createChannel { boardId = model.userProfile.selectedBoard, stackId = newId, channelId = channelItem.itemId, channelName = channelItem.name } model.board } |> withoutCommand
 
         LoadMoreSearch nextPage ->
             ( { model | board = startLoadingNextPage "SEARCH" model.board }
@@ -651,16 +659,18 @@ viewStack { renamingState, dragState, videoBeingPlayed, board } attributes stack
                             [ button [ onMouseDownAlwaysStopPropagation (StartModifyingItem { itemId = id, newName = name }), class "icon-button" ] [ img [ src "/icons/edit.svg" ] [] ]
                             , button [ onMouseDownAlwaysStopPropagation (RemoveStack id), class "icon-button" ] [ img [ src "/icons/delete.svg" ] [] ]
                             ]
+                        , div [ class "small-text" ] [ text stack.stackType ]
                         ]
                     , div [ class "column-content" ]
-                        (List.append
-                            (if List.isEmpty items then
+                        (List.concat
+                            [ [ viewChannelButtons stack ]
+                            , if List.isEmpty items then
                                 [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag id) ] [] ]
 
-                             else
+                              else
                                 List.map (\item -> viewItem [] dragState videoBeingPlayed item) items
-                            )
-                            [ viewStackStatus (LoadMorePlaylist stack) id board ]
+                            , [ viewStackStatus (LoadMorePlaylist stack) id board ]
+                            ]
                         )
                     ]
                 , div [ class "column-footer", onMouseEnter (StackOverlayEnterDuringDrag id) ] []
@@ -668,6 +678,18 @@ viewStack { renamingState, dragState, videoBeingPlayed, board } attributes stack
 
         Nothing ->
             div [] []
+
+
+viewChannelButtons : Stack -> Html Msg
+viewChannelButtons stack =
+    if stack.stackType == "YoutubeChannel" then
+        div [ class "channel-buttons" ]
+            [ button [ class "dark" ] [ text "videos" ]
+            , button [ class "dark" ] [ text "playlists" ]
+            ]
+
+    else
+        div [] []
 
 
 viewSidebar : Model -> Html Msg
@@ -857,6 +879,9 @@ viewItemIcon item =
 
         "playlist" ->
             div [ class "item-icon-area", onClick (LoadPlaylistClick item) ] [ img [ draggable "false", src "/icons/loadPlaylist.svg" ] [] ]
+
+        "channel" ->
+            div [ class "item-icon-area", onClick (LoadChannelClick item) ] [ img [ draggable "false", src "/icons/loadPlaylist.svg" ] [] ]
 
         _ ->
             div [] []
