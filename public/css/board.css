@@ -29,11 +29,48 @@
     overflow-x: auto;
 }
 
-.board-title {
+.tabs {
     height: var(--board-header-height);
-    padding: var(--item-padding);
+    width: var(--board-width);
+    display: flex;
+    flex-direction: row;
+    margin-bottom: var(--item-padding);
+    background-color: lightgrey;
+    overflow-x: auto;
+}
+
+.tab-item:hover{
+    background-color: #b9b9b9;
+}
+
+.tab-item:active{
+     background-color: #9b9b9b;
+ }
+
+.tab-item{
+    padding-left: 10px;
+    padding-right: 10px;
+    width: 150px;
+    min-width: 150px;
+    padding-top: 8px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.tab-item.add{
+    background-color: var(--accent-color);
+    width: initial;
+}
+
+.tab-item.active{
+    background-color: var(--primary-color);
     font-weight: bold;
     color: white;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+
 }
 
 .board-during-drag {

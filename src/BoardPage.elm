@@ -609,7 +609,7 @@ viewBoard model =
                 , classIf (model.sidebarState /= Hidden) "board-with-sidebar"
                 ]
                 [ viewPlayer model
-                , viewBoardBar board
+                , viewTabs model
                 , div
                     [ class "columns-container", id "columns-container" ]
                     (List.append
@@ -626,9 +626,18 @@ viewBoard model =
             div [] [ text "Loading BOARD" ]
 
 
-viewBoardBar : Board -> Html Msg
-viewBoardBar { name } =
-    div [ class "board-title" ] [ text name ]
+viewTabs : Model -> Html Msg
+viewTabs model =
+    div [ class "tabs" ]
+        (model.userProfile.boards
+            |> List.map (flip Dict.get model.board.boards)
+            |> unpackMaybes
+            |> List.map (\board -> viewTab board (board.id == model.userProfile.selectedBoard))
+        )
+
+
+viewTab board isSelected =
+    div [ onClick (SelectBoard board.id), class "tab-item", classIf isSelected "active" ] [ text board.name ]
 
 
 viewStack : Model -> List (Attribute Msg) -> String -> Html Msg
