@@ -122,6 +122,7 @@ type Msg
     | StackOverlayEnterDuringDrag String
     | BoardEnterDuringDrag String
     | ItemEnterDuringDrag String
+    | ToggleCollapsed String
       -- Board
     | CreateStack String
     | OnSearchInput String
@@ -464,6 +465,9 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
+        ToggleCollapsed stackId ->
+            ( { model | board = updateStack stackId (\s -> { s | isCollapsed = not s.isCollapsed }) model.board }, Cmd.none )
+
         TogglePlayerMode ->
             let
                 nextPlayerState =
@@ -645,22 +649,26 @@ viewStack { renamingState, dragState, videoBeingPlayed, board } attributes stack
                 [ div [ class "column-title" ]
                     [ viewContent renamingState { id = id, name = name }
                     , div [ class "column-title-actions" ]
-                        [ button [ onMouseDownAlwaysStopPropagation (StartModifyingItem { itemId = id, newName = name }), class "icon-button" ] [ img [ src "/icons/edit.svg" ] [] ]
-                        , button [ onMouseDownAlwaysStopPropagation (RemoveStack id), class "icon-button" ] [ img [ src "/icons/delete.svg" ] [] ]
+                        [ button [ onClick (StartModifyingItem { itemId = id, newName = name }), class "icon-button" ] [ img [ src "/icons/edit.svg" ] [] ]
+                        , button [ onClick (RemoveStack id), class "icon-button" ] [ img [ src "/icons/delete.svg" ] [] ]
+                        , button [ onClick (ToggleCollapsed id), class "icon-button", classIf (not stack.isCollapsed) "rotate180" ] [ img [ src "/icons/expand.svg" ] [] ]
                         ]
-                    , div [ class "small-text" ] [ text stack.stackType ]
                     ]
-                , div [ class "column-content" ]
-                    (List.concat
-                        [ [ viewChannelButtons stack ]
-                        , if List.isEmpty items then
-                            [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag id) ] [] ]
+                , if not stack.isCollapsed then
+                    div [ class "column-content" ]
+                        (List.concat
+                            [ [ viewChannelButtons stack ]
+                            , if List.isEmpty items then
+                                [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag id) ] [] ]
 
-                          else
-                            List.map (\item -> viewItem [] dragState videoBeingPlayed item) items
-                        , [ viewStackStatus (LoadMorePlaylist stack) id board ]
-                        ]
-                    )
+                              else
+                                List.map (\item -> viewItem [] dragState videoBeingPlayed item) items
+                            , [ viewStackStatus (LoadMorePlaylist stack) id board ]
+                            ]
+                        )
+
+                  else
+                    div [] []
                 ]
 
         Nothing ->

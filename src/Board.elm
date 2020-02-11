@@ -18,6 +18,7 @@ type alias Stack =
         , stackType : String
         , stackState : StackStatus
         , playlistId : Maybe String
+        , isCollapsed : Bool
         }
 
 
@@ -46,7 +47,7 @@ type alias BoardModel =
 
 
 makeStack id name =
-    { id = id, name = name, children = [], stackState = Ready Nothing, stackType = "UserCreated", playlistId = Nothing }
+    { id = id, name = name, children = [], isCollapsed = False, stackState = Ready Nothing, stackType = "UserCreated", playlistId = Nothing }
 
 
 init : BoardModel
@@ -108,8 +109,9 @@ setBoards boards model =
 
 createStack boardId newStackId model =
     let
+        newStack : Stack
         newStack =
-            { id = newStackId, name = "New Stack", children = [], playlistId = Nothing, stackType = "UserCreated", stackState = Ready Nothing }
+            { id = newStackId, name = "New Stack", children = [], playlistId = Nothing, stackType = "UserCreated", stackState = Ready Nothing, isCollapsed = False }
 
         newStacks =
             Dict.insert newStackId newStack model.stacks
@@ -122,7 +124,7 @@ createStack boardId newStackId model =
 createPlaylist { boardId, stackId, playlistId, playlistName } model =
     let
         newStack =
-            { id = stackId, name = playlistName, playlistId = Just playlistId, children = [], stackType = "YoutubePlaylist", stackState = IsLoading }
+            { id = stackId, name = playlistName, playlistId = Just playlistId, children = [], stackType = "YoutubePlaylist", stackState = IsLoading, isCollapsed = False }
 
         newStacks =
             Dict.insert stackId newStack model.stacks
@@ -134,8 +136,9 @@ createPlaylist { boardId, stackId, playlistId, playlistName } model =
 
 createChannel { boardId, stackId, channelId, channelName } model =
     let
+        newStack : Stack
         newStack =
-            { id = stackId, name = channelName, playlistId = Just channelId, children = [], stackType = "YoutubeChannel", stackState = IsLoading }
+            { id = stackId, name = channelName, playlistId = Just channelId, children = [], stackType = "YoutubeChannel", stackState = IsLoading, isCollapsed = False }
 
         newStacks =
             Dict.insert stackId newStack model.stacks
@@ -259,6 +262,7 @@ type alias StackResponse =
     , stackType : String
     , nextPage : Maybe String
     , items : List Item
+    , isCollapsed : Maybe Bool
     }
 
 
@@ -283,13 +287,14 @@ decodeBoard =
 
 decodeStack : Json.Decoder StackResponse
 decodeStack =
-    Json.map6 StackResponse
+    Json.map7 StackResponse
         (Json.field "id" Json.string)
         (Json.field "name" Json.string)
         (Json.maybe (Json.field "playlistId" Json.string))
         (Json.oneOf [ Json.field "stackType" Json.string, Json.succeed "UserCreated" ])
         (Json.maybe (Json.field "nextPage" Json.string))
         (Json.field "items" (Json.list decodeItem))
+        (Json.maybe (Json.field "isCollapsed" Json.bool))
 
 
 decodeItem : Json.Decoder Item
@@ -308,7 +313,7 @@ mergeAndNormalizeResponse : BoardResponse -> BoardModel -> BoardModel
 mergeAndNormalizeResponse boardResponse model =
     let
         stacks =
-            Dict.fromList (List.map (\s -> ( s.id, { id = s.id, stackType = s.stackType, name = s.name, children = getIds s.items, playlistId = s.playlistId, stackState = Ready s.nextPage } )) boardResponse.stacks)
+            Dict.fromList (List.map (\s -> ( s.id, { id = s.id, isCollapsed = s.isCollapsed |> Maybe.withDefault False, stackType = s.stackType, name = s.name, children = getIds s.items, playlistId = s.playlistId, stackState = Ready s.nextPage } )) boardResponse.stacks)
 
         allItems =
             boardResponse.stacks |> List.map (\s -> s.items) |> List.concat
@@ -341,7 +346,7 @@ denormalizeBoard boardId model =
 
                     mapStack : Stack -> StackResponse
                     mapStack s =
-                        { id = s.id, name = s.name, stackType = s.stackType, playlistId = s.playlistId, items = s.children |> List.map (\id -> Dict.get id model.items) |> unpackMaybes, nextPage = mapPage s.stackState }
+                        { id = s.id, isCollapsed = Just s.isCollapsed, name = s.name, stackType = s.stackType, playlistId = s.playlistId, items = s.children |> List.map (\id -> Dict.get id model.items) |> unpackMaybes, nextPage = mapPage s.stackState }
 
                     stacks =
                         stacksNarrow |> List.map mapStack
