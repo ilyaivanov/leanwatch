@@ -20,8 +20,9 @@
 
 .columns-container {
     display: flex;
-    flex-direction: row;
-    align-items: stretch;
+    flex-direction: column;
+    flex-wrap: wrap;
+    align-content: flex-start;
     min-height: var(--column-container-height);
     height: var(--column-container-height);
     width: var(--board-width);
@@ -50,8 +51,10 @@
     background-color: var(--stack-color);
     border-radius: 4px;
     overflow: auto;
+    align-self: flex-start;
     box-shadow: 1px 2px 5px 0px rgba(0, 0, 0, 0.53);
     position: relative;
+    margin-bottom: var(--item-padding);
 }
 
 .column-board {
@@ -103,7 +106,7 @@
     /* background-color: rgb(234, 253, 205); */
 }
 
-.channel-buttons{
+.channel-buttons {
     display: flex;
     flex-direction: row;
 }
@@ -138,19 +141,21 @@
     color: white;
 }
 
-.item-image-container{
+.item-image-container {
     height: 100%;
     width: var(--card-image-width);
     position: relative;
 }
+
 .item-image {
     height: 100%;
     width: 100%;
     object-fit: cover;
 }
-.item-duration{
+
+.item-duration {
     background-color: #1e1e1e;
-    color: rgba(255,255,255,0.8);
+    color: rgba(255, 255, 255, 0.8);
     font-size: 10px;
     position: absolute;
     right: 0;
@@ -226,8 +231,8 @@
 
 .item-progress-filled {
     position: absolute;
-    bottom:0;
-    left:0;
+    bottom: 0;
+    left: 0;
     height: var(--card-progress-height);
     background-color: #cf6d68;
 }

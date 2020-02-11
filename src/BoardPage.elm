@@ -647,33 +647,32 @@ viewStack { renamingState, dragState, videoBeingPlayed, board } attributes stack
                 { id, name } =
                     stack
             in
-            div (List.append [ class "column-drag-overlay" ] attributes)
-                [ div
+            div
+                (List.append
                     [ class "column"
                     , classIf (isDraggingItem dragState id) "column-preview"
-                    , onMouseEnter (StackEnterDuringDrag id)
                     ]
-                    [ div [ class "column-title", onMouseDown (StackTitleMouseDown id) ]
-                        [ viewContent renamingState { id = id, name = name }
-                        , div [ class "column-title-actions" ]
-                            [ button [ onMouseDownAlwaysStopPropagation (StartModifyingItem { itemId = id, newName = name }), class "icon-button" ] [ img [ src "/icons/edit.svg" ] [] ]
-                            , button [ onMouseDownAlwaysStopPropagation (RemoveStack id), class "icon-button" ] [ img [ src "/icons/delete.svg" ] [] ]
-                            ]
-                        , div [ class "small-text" ] [ text stack.stackType ]
+                    attributes
+                )
+                [ div [ class "column-title" ]
+                    [ viewContent renamingState { id = id, name = name }
+                    , div [ class "column-title-actions" ]
+                        [ button [ onMouseDownAlwaysStopPropagation (StartModifyingItem { itemId = id, newName = name }), class "icon-button" ] [ img [ src "/icons/edit.svg" ] [] ]
+                        , button [ onMouseDownAlwaysStopPropagation (RemoveStack id), class "icon-button" ] [ img [ src "/icons/delete.svg" ] [] ]
                         ]
-                    , div [ class "column-content" ]
-                        (List.concat
-                            [ [ viewChannelButtons stack ]
-                            , if List.isEmpty items then
-                                [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag id) ] [] ]
-
-                              else
-                                List.map (\item -> viewItem [] dragState videoBeingPlayed item) items
-                            , [ viewStackStatus (LoadMorePlaylist stack) id board ]
-                            ]
-                        )
+                    , div [ class "small-text" ] [ text stack.stackType ]
                     ]
-                , div [ class "column-footer", onMouseEnter (StackOverlayEnterDuringDrag id) ] []
+                , div [ class "column-content" ]
+                    (List.concat
+                        [ [ viewChannelButtons stack ]
+                        , if List.isEmpty items then
+                            [ div [ class "empty-stack-placeholder", onMouseEnter (StackOverlayEnterDuringDrag id) ] [] ]
+
+                          else
+                            List.map (\item -> viewItem [] dragState videoBeingPlayed item) items
+                        , [ viewStackStatus (LoadMorePlaylist stack) id board ]
+                        ]
+                    )
                 ]
 
         Nothing ->
