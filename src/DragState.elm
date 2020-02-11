@@ -8,9 +8,7 @@ module DragState exposing
     , handleCardMouseDown
     , handleMouseMove
     , handleMouseUp
-    , handleStackEnter
     , handleStackOverlayEnter
-    , handleStackTitleMouseDown
     , init
     , isDraggingAnyBoard
     , isDraggingAnything
@@ -30,7 +28,6 @@ type DragState
 
 type ItemBeingDragged
     = BoardBeingDragged
-    | StackBeingDragged
     | CardBeingDragged
 
 
@@ -98,11 +95,6 @@ handleBoardMouseDown boardId { mousePosition, offsets } =
     PressedNotYetMoved BoardBeingDragged mousePosition offsets boardId 0
 
 
-handleStackTitleMouseDown : String -> MouseDownEvent -> DragState
-handleStackTitleMouseDown stackId { mousePosition, offsets } =
-    PressedNotYetMoved StackBeingDragged mousePosition offsets stackId 0
-
-
 handleCardEnter dragState cardUnderId stacks =
     case dragState of
         DraggingSomething itemType _ _ itemOverId ->
@@ -111,19 +103,6 @@ handleCardEnter dragState cardUnderId stacks =
 
             else
                 Just (moveItem stacks { from = itemOverId, to = cardUnderId })
-
-        _ ->
-            Nothing
-
-
-handleStackEnter dragState stackUnderId boards =
-    case dragState of
-        DraggingSomething itemType _ _ itemOverId ->
-            if itemOverId == stackUnderId || itemType /= StackBeingDragged then
-                Nothing
-
-            else
-                Just (moveItem boards { from = itemOverId, to = stackUnderId })
 
         _ ->
             Nothing
@@ -148,9 +127,6 @@ handleStackOverlayEnter dragState stackUnder partialModel =
     case dragState of
         DraggingSomething itemType _ _ itemOverId ->
             case itemType of
-                StackBeingDragged ->
-                    Just { partialModel | boards = moveItem partialModel.boards { from = itemOverId, to = stackUnder } }
-
                 CardBeingDragged ->
                     Just { partialModel | stacks = moveItemToEnd partialModel.stacks { itemToMove = itemOverId, targetParent = stackUnder } }
 

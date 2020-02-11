@@ -115,13 +115,11 @@ type PlayerMode
 type Msg
     = Noop
       -- DND events
-    | StackTitleMouseDown String MouseDownEvent
     | ItemMouseDown String MouseDownEvent
     | BoardMouseDown String MouseDownEvent
     | MouseMove MouseMoveEvent
     | MouseUp
     | StackOverlayEnterDuringDrag String
-    | StackEnterDuringDrag String
     | BoardEnterDuringDrag String
     | ItemEnterDuringDrag String
       -- Board
@@ -230,9 +228,6 @@ update msg model =
         BoardMouseDown boardId event ->
             noComand { model | dragState = handleBoardMouseDown boardId event }
 
-        StackTitleMouseDown stackId event ->
-            noComand { model | dragState = handleStackTitleMouseDown stackId event }
-
         MouseUp ->
             let
                 ( nextDragState, item ) =
@@ -256,13 +251,6 @@ update msg model =
         ItemEnterDuringDrag itemUnder ->
             handleCardEnter model.dragState itemUnder model.board.stacks
                 |> Maybe.map (\newStacks -> { model | board = setStacks newStacks model.board })
-                |> Maybe.map markSelectedBoardAsNeededToSync
-                |> Maybe.withDefault model
-                |> noComand
-
-        StackEnterDuringDrag stackUnder ->
-            handleStackEnter model.dragState stackUnder model.board.boards
-                |> Maybe.map (\newBoards -> { model | board = setBoards newBoards model.board })
                 |> Maybe.map markSelectedBoardAsNeededToSync
                 |> Maybe.withDefault model
                 |> noComand
@@ -928,9 +916,6 @@ viewElementBeingDragged model =
             Dict.get itemId model.board.items
                 |> Maybe.map (viewItem (getAttributes elementPosition) DragState.init model.videoBeingPlayed)
                 |> Maybe.withDefault (div [] [])
-
-        Just ( StackBeingDragged, elementPosition, stackId ) ->
-            viewStack { model | renamingState = NoRename, dragState = DragState.init } (getAttributes elementPosition) stackId
 
         Just ( BoardBeingDragged, elementPosition, boardId ) ->
             model.board.boards
